@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "dl-fov-fixer"
+version = "1.0.0"
+description = "Tray app that keeps Deadlock's FOV (r_aspectratio in gameinfo.gi) applied across game updates."
+readme = "README.md"
+requires-python = ">=3.9"
+license = { file = "LICENSE" }
+authors = [{ name = "Lukáš Krejčí" }]
+dependencies = [
+    "pystray>=0.19.4",
+    "Pillow>=10.0.0",
+]
+
+[project.scripts]
+dl-fov-fixer = "dlfovfixer.app:main"
+
+[tool.setuptools]
+packages = ["dlfovfixer"]
