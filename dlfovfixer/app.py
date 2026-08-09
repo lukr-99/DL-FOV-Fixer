@@ -31,6 +31,7 @@ _cfg: dict = {}
 _icon: "pystray.Icon | None" = None
 _root: "tk.Tk | None" = None
 _periodic_job = None
+_status_error = False  # set when a locate/read/write actually fails
 
 
 # --------------------------------------------------------------------------
@@ -119,6 +120,32 @@ def _fov_label(value) -> str:
     return f"{value} (~{deg}°)" if deg is not None else str(value)
 
 
+def _compute_status() -> str:
+    """Live tri-state used to color the tray icon."""
+    if _status_error:
+        return "error"
+    if not _have_file():
+        return "error"        # can't find the game file -> a problem worth red
+    try:
+        current = gameinfo.read_current(_path())
+    except Exception:  # noqa: BLE001
+        return "error"
+    if current is None:
+        return "idle"         # located, but FOV not applied yet
+    return "ok" if current == _cfg["fov_value"] else "idle"  # idle = drifted/waiting
+
+
+def _refresh_icon():
+    """Recolor the tray icon and tooltip to match the current status."""
+    if _icon is None:
+        return
+    try:
+        _icon.icon = iconfactory.build_image(64, _compute_status())
+        _icon.title = f"{APP_TITLE} — {_status_text()}"
+    except Exception:  # noqa: BLE001 - cosmetic only
+        pass
+
+
 def _ensure_located(interactive: bool) -> bool:
     """Make sure we have a valid gameinfo.gi path. Returns True if we do."""
     if _have_file():
@@ -140,29 +167,38 @@ def _ensure_located(interactive: bool) -> bool:
 
 
 def apply_now(interactive: bool = True, notify: bool = True) -> bool:
+    global _status_error
     if not _ensure_located(interactive):
+        _refresh_icon()
         if interactive:
             _notify("Couldn't find gameinfo.gi. Use 'Locate gameinfo.gi…'.")
         return False
     try:
         status, prev = gameinfo.patch(_path(), _cfg["fov_value"])
     except Exception as exc:  # noqa: BLE001
+        _status_error = True
+        _refresh_icon()
         _notify(f"Failed to update file: {exc}")
         return False
+    _status_error = False
     if notify:
         val = _cfg["fov_value"]
         if status == gameinfo.ALREADY_OK:
             _notify(f"FOV already set — r_aspectratio {_fov_label(val)}.")
         else:
             _notify(f"FOV applied — r_aspectratio {_fov_label(val)}.")
+    _refresh_icon()
     return True
 
 
 def check_now():
+    global _status_error
     if not _ensure_located(interactive=True):
+        _refresh_icon()
         _notify("Couldn't find gameinfo.gi. Use 'Locate gameinfo.gi…'.")
         return
     current = gameinfo.read_current(_path())
+    _status_error = False
     target = _cfg["fov_value"]
     if current is None:
         _notify("r_aspectratio is not set in the file. Click 'Apply FOV now'.")
@@ -173,6 +209,7 @@ def check_now():
             f"File has {_fov_label(current)}, your target is {_fov_label(target)}. "
             "Click 'Apply FOV now'."
         )
+    _refresh_icon()
 
 
 def set_value(value: str, apply: bool = True):
@@ -184,6 +221,7 @@ def set_value(value: str, apply: bool = True):
     config.save(_cfg)
     if apply:
         apply_now(interactive=True, notify=True)
+    _refresh_icon()
     if _icon is not None:
         _icon.update_menu()
 
@@ -226,13 +264,16 @@ def _on_open_file(icon, item):
 
 
 def _on_locate(icon, item):
+    global _status_error
     picked = _ask_gameinfo_path()
     if not picked:
         return
     if locator.looks_like_gameinfo(picked):
         _cfg["gameinfo_path"] = os.path.normpath(picked)
         config.save(_cfg)
+        _status_error = False
         _notify("gameinfo.gi location saved.")
+        _refresh_icon()
         icon.update_menu()
     else:
         _show_info("That doesn't look like a Deadlock gameinfo.gi file.")
@@ -350,6 +391,7 @@ def _on_setup(icon):
     _first_run_setup()
     if _cfg.get("auto_apply_on_start", True):
         apply_now(interactive=False, notify=True)
+    _refresh_icon()
     _schedule_periodic()
     icon.update_menu()
 
@@ -361,16 +403,19 @@ def _schedule_periodic():
         return
 
     def tick():
+        global _status_error
         if _have_file() and _cfg.get("auto_apply_on_start", True):
             try:
                 status, _ = gameinfo.patch(_path(), _cfg["fov_value"])
+                _status_error = False
                 if status != gameinfo.ALREADY_OK:
                     _notify(
                         f"Re-applied FOV after a game change — "
                         f"r_aspectratio {_fov_label(_cfg['fov_value'])}."
                     )
             except Exception:  # noqa: BLE001 - never let the timer die loudly
-                pass
+                _status_error = True
+        _refresh_icon()
         _schedule_periodic()
 
     _periodic_job = _root.after(minutes * 60 * 1000, tick)

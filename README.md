@@ -25,6 +25,16 @@ This app remembers your chosen value and re-applies it for you.
   update wipes the file, it just fixes itself.
 - Makes a one-time backup next to the original: `gameinfo.gi.dlfovfixer.bak`.
 
+## Status at a glance
+
+The tray icon changes color so you can tell the state without opening the menu:
+
+| Icon | Meaning |
+|------|---------|
+| 🟢 **Green** | File found and your FOV value is applied — all good. |
+| 🟠 **Amber** | Found, but not applied yet or it drifted (e.g. after an update). Auto-apply turns it green. |
+| 🔴 **Red** | A problem — `gameinfo.gi` can't be found/read, or a write failed. |
+
 ## Tray menu
 
 | Item | Action |
