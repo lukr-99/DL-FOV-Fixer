@@ -1,90 +1,77 @@
 """Generate the app icon at runtime (for the tray) and export an .ico file.
 
-The look is Deadlock-flavored: a dark warm tile with a colored border, a faint
-field-of-view "cone" motif, and bold "FOV" lettering. A small corner dot and
-the border color encode the live status so the tray icon is readable at a
-glance:
+The mark is a bold **field-of-view vision cone**: a fan of sightlines opening
+from a camera "lens" at the bottom, drawn on a dark rounded tile. The cone is
+filled with the live status color so the tray icon is unmistakable at a glance,
+even at 16 px:
 
     "ok"    -> green   : file located and FOV matches your target
     "idle"  -> amber   : located but not applied yet / drifted, waiting
     "error" -> red     : gameinfo.gi missing / unreadable / write failed
 
-No external art assets are needed — everything is drawn with Pillow.
+The shape stays constant (that's the app's identity); only the color changes
+(that's the state). No external art assets are needed — it's all drawn with
+Pillow.
 """
 
 from __future__ import annotations
 
-from PIL import Image, ImageDraw, ImageFont
+import math
 
-_BG = (22, 18, 14, 255)      # near-black, warm
-_TEXT = (240, 200, 128, 255)  # light gold (always readable)
+from PIL import Image, ImageDraw
 
-# Per-status accent colors: border ring, FOV cone, and corner status dot.
+_BG = (26, 22, 17, 255)     # warm charcoal tile
+_LENS = (18, 15, 11, 255)   # dark camera "lens" at the cone apex
+
+# Per-status colors: bright = cone fill + tile border, deep = sightlines/arc.
 _STATUS = {
-    "idle": dict(border=(196, 148, 74, 255), cone=(96, 178, 176, 255), dot=(214, 162, 84, 255)),
-    "ok":   dict(border=(86, 184, 98, 255),  cone=(96, 178, 176, 255), dot=(96, 208, 110, 255)),
-    "error": dict(border=(210, 76, 76, 255), cone=(150, 96, 96, 255),  dot=(232, 78, 78, 255)),
+    "idle":  dict(bright=(240, 170, 60, 255),  deep=(150, 96, 20, 255)),
+    "ok":    dict(bright=(74, 200, 110, 255),  deep=(26, 120, 60, 255)),
+    "error": dict(bright=(235, 72, 72, 255),   deep=(140, 30, 30, 255)),
 }
-
-_FONT_CANDIDATES = [
-    "arialbd.ttf", "segoeuib.ttf", "bahnschrift.ttf",
-    "impact.ttf", "seguisb.ttf", "arial.ttf",
-]
-
-
-def _load_font(px: int) -> ImageFont.FreeTypeFont:
-    for name in _FONT_CANDIDATES:
-        try:
-            return ImageFont.truetype(name, px)
-        except OSError:
-            continue
-    return ImageFont.load_default()
 
 
 def build_image(size: int = 256, status: str = "idle") -> Image.Image:
-    """Render the icon at the given square size for the given status."""
-    colors = _STATUS.get(status, _STATUS["idle"])
+    """Render the vision-cone icon at the given square size and status."""
+    c = _STATUS.get(status, _STATUS["idle"])
     scale = 4  # supersample for crisp edges, then downsample
     s = size * scale
     img = Image.new("RGBA", (s, s), (0, 0, 0, 0))
     d = ImageDraw.Draw(img)
 
-    margin = s * 0.06
-    radius = s * 0.24
-    border_w = max(2, int(s * 0.05))
+    # Rounded tile with a status-colored border.
+    m = s * 0.05
     d.rounded_rectangle(
-        [margin, margin, s - margin, s - margin],
-        radius=radius, fill=_BG, outline=colors["border"], width=border_w,
+        [m, m, s - m, s - m], radius=s * 0.26,
+        fill=_BG, outline=c["bright"], width=max(2, int(s * 0.06)),
     )
 
-    # Field-of-view "cone" fanning up from the bottom center (behind the text).
-    apex = (s * 0.5, s * 0.86)
-    spread = s * 0.30
-    top_y = s * 0.30
-    cone_w = max(2, int(s * 0.018))
-    for dx in (-spread, spread):
-        d.line([apex, (s * 0.5 + dx, top_y)], fill=colors["cone"], width=cone_w)
-    d.arc(
-        [s * 0.5 - spread, top_y - spread * 0.5,
-         s * 0.5 + spread, top_y + spread * 1.5],
-        start=200, end=340, fill=colors["cone"], width=cone_w,
-    )
+    apex = (s * 0.5, s * 0.82)
+    r = s * 0.60
+    half = 45           # half-angle of the cone
+    up = 270            # PIL: 0=east, 270=north(up)
+    box = [apex[0] - r, apex[1] - r, apex[0] + r, apex[1] + r]
 
-    # "FOV" lettering, centered.
-    font = _load_font(int(s * 0.30))
-    text = "FOV"
-    l, t, r, b = d.textbbox((0, 0), text, font=font)
-    tx = (s - (r - l)) / 2 - l
-    ty = s * 0.52 - t
-    d.text((tx + scale, ty + scale), text, font=font, fill=(0, 0, 0, 150))  # shadow
-    d.text((tx, ty), text, font=font, fill=_TEXT)
+    # Filled field-of-view cone.
+    d.pieslice(box, up - half, up + half, fill=c["bright"])
 
-    # Status dot in the bottom-right corner (dark ring for contrast).
-    dr = s * 0.15
-    cx, cy = s * 0.78, s * 0.78
-    d.ellipse([cx - dr - scale, cy - dr - scale, cx + dr + scale, cy + dr + scale],
-              fill=(12, 10, 8, 255))
-    d.ellipse([cx - dr, cy - dr, cx + dr, cy + dr], fill=colors["dot"])
+    # Sightlines fanning through the cone (the "field of view" grid).
+    ray_w = max(1, int(s * 0.013))
+    for a in (-half + 6, -half * 0.5, 0, half * 0.5, half - 6):
+        ang = math.radians(up + a)
+        x = apex[0] + r * 0.94 * math.cos(ang)
+        y = apex[1] + r * 0.94 * math.sin(ang)
+        d.line([apex, (x, y)], fill=c["deep"], width=ray_w)
+
+    # Inner range arc.
+    ir = r * 0.56
+    d.arc([apex[0] - ir, apex[1] - ir, apex[0] + ir, apex[1] + ir],
+          up - half, up + half, fill=c["deep"], width=max(1, int(s * 0.022)))
+
+    # Camera lens at the apex (the viewer).
+    lr = s * 0.08
+    d.ellipse([apex[0] - lr, apex[1] - lr, apex[0] + lr, apex[1] + lr],
+              fill=_LENS, outline=c["bright"], width=max(1, int(s * 0.022)))
 
     return img.resize((size, size), Image.LANCZOS)
 
