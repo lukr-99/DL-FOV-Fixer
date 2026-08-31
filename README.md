@@ -39,14 +39,42 @@ The tray icon changes color so you can tell the state without opening the menu:
 
 | Item | Action |
 |------|--------|
-| **Apply FOV now** | Write your target value into `gameinfo.gi` (also the default double-click action). |
-| **Check file now** | Report whether the file currently matches your target. |
+| **Apply now** | Write the FOV (and, if enabled, all extra tweaks) into the files. Default double-click action. |
+| **Check file now** | Report whether `gameinfo.gi` currently matches your FOV target. |
 | **Set FOV value ▸** | Pick a preset (80–115°) or enter a custom `r_aspectratio` value. |
+| **Extra tweaks ▸** | Paste/import a config, view or clear stored tweaks, toggle applying them. |
 | **Open gameinfo.gi** | Open the file in your editor. |
 | **Locate gameinfo.gi…** | Manually point the app at the file. |
 | **Apply automatically on start** | Toggle auto-apply when the app launches. |
 | **Start with Windows** | Toggle launch at sign-in (per-user `Run` key). |
 | **Quit** | Exit. |
+
+## Extra tweaks — paste a whole config
+
+FOV isn't the only thing an update wipes. **Extra tweaks ▸ Paste / import config…**
+opens a box where you can paste someone's whole config; the app stores it and
+re-applies it alongside the FOV, so a game update can't blow away your setup.
+
+Keys are routed automatically **by shape** — no need to keep the section
+headers:
+
+| Key looks like | Goes to |
+|----------------|---------|
+| `setting.*` | `cfg/video.txt` |
+| `PascalCase` (e.g. `GpuLightBinner`) | `gameinfo.gi` → `SceneSystem` |
+| anything else (e.g. `r_*`, `cl_*`, `lb_*`) | `gameinfo.gi` → `ConVars` |
+
+You can paste bare (`r_directlighting 0`) or quoted (`"r_directlighting" "0"`)
+pairs, with `//` comments and decorative headers — all of that is ignored, and
+`r_aspectratio` is treated as your FOV. Merging is **surgical**: existing keys
+are updated in place (comments kept), new keys are added at the top of the
+block, and anything that already exists as a nested sub-block (e.g. `rate`,
+`speaker_config`) is left untouched so the game still launches.
+
+> **Note on video settings:** modern Deadlock keeps video settings in `.vcfg`
+> files and there may be no `video.txt`. The app will create `cfg/video.txt`
+> from any `setting.*` keys you paste, but whether the game reads it can vary —
+> the `gameinfo.gi` ConVars/SceneSystem tweaks are the reliable part.
 
 ## FOV reference
 

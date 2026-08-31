@@ -22,12 +22,34 @@ DEFAULTS = {
     "auto_apply_on_start": True,  # re-apply automatically when the app launches
     "periodic_check_minutes": 10, # re-check while running (0 disables)
     "start_with_windows": False,  # launch on Windows sign-in
+    # Extra pasted config, re-applied alongside the FOV so a game update can't
+    # wipe it. Each is an ordered list of [key, value] pairs.
+    "tweaks": {"convars": [], "scenesystem": [], "video": []},
+    "apply_tweaks": True,         # apply the extra tweaks, not just the FOV
 }
+
+_TWEAK_KEYS = ("convars", "scenesystem", "video")
+
+
+def _normalize_tweaks(value) -> dict:
+    """Coerce stored tweaks into {section: [[k, v], …]} with all sections present."""
+    out = {k: [] for k in _TWEAK_KEYS}
+    if isinstance(value, dict):
+        for section in _TWEAK_KEYS:
+            items = value.get(section)
+            if isinstance(items, list):
+                out[section] = [
+                    [str(kv[0]), str(kv[1])]
+                    for kv in items
+                    if isinstance(kv, (list, tuple)) and len(kv) == 2
+                ]
+    return out
 
 
 def load() -> dict:
     """Load config, filling in any missing keys with defaults."""
     cfg = dict(DEFAULTS)
+    cfg["tweaks"] = _normalize_tweaks(None)
     try:
         with open(CONFIG_PATH, "r", encoding="utf-8") as fh:
             data = json.load(fh)
@@ -35,6 +57,7 @@ def load() -> dict:
             cfg.update({k: data[k] for k in DEFAULTS if k in data})
     except (OSError, ValueError):
         pass
+    cfg["tweaks"] = _normalize_tweaks(cfg.get("tweaks"))
     return cfg
 
 

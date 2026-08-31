@@ -17,13 +17,14 @@ from __future__ import annotations
 import os
 import subprocess
 import sys
+import tempfile
 import threading
 import tkinter as tk
 from tkinter import filedialog, messagebox, simpledialog
 
 import pystray
 
-from . import config, gameinfo, iconfactory, locator, startup
+from . import config, gameinfo, iconfactory, locator, startup, tweaks
 
 APP_TITLE = "DL FOV Fixer"
 
@@ -104,6 +105,52 @@ def _show_info(message: str):
     _ui_call(lambda: messagebox.showinfo(APP_TITLE, message, parent=_dialog_parent()))
 
 
+def _ask_yesno(message: str) -> bool:
+    return bool(_ui_call(
+        lambda: messagebox.askyesno(APP_TITLE, message, parent=_dialog_parent())
+    ))
+
+
+def _ask_paste():
+    """Multiline paste box for importing someone's config. Returns text or None."""
+    def run():
+        _dialog_parent()
+        top = tk.Toplevel(_root)
+        top.title("Import Deadlock config")
+        top.attributes("-topmost", True)
+        top.geometry("660x480")
+        tk.Label(
+            top, justify="left",
+            text=("Paste a Deadlock config below (ConVars, SceneSystem and/or\n"
+                  "video.cfg settings). Keys are sorted automatically:\n"
+                  "  setting.* → video.cfg    PascalCase → SceneSystem    "
+                  "other → ConVars\n"
+                  "r_aspectratio sets your FOV. Comments and headers are ignored."),
+        ).pack(anchor="w", padx=10, pady=(10, 6))
+        txt = tk.Text(top, wrap="none", width=84, height=22, undo=True)
+        txt.pack(fill="both", expand=True, padx=10, pady=4)
+        txt.focus_set()
+        result = {"text": None}
+        bar = tk.Frame(top)
+        bar.pack(fill="x", padx=10, pady=(4, 10))
+
+        def do_import():
+            result["text"] = txt.get("1.0", "end")
+            top.destroy()
+
+        def do_cancel():
+            top.destroy()
+
+        tk.Button(bar, text="Import", width=12, command=do_import).pack(side="right")
+        tk.Button(bar, text="Cancel", width=12, command=do_cancel).pack(
+            side="right", padx=(0, 8))
+        top.bind("<Escape>", lambda e: do_cancel())
+        top.grab_set()
+        _root.wait_window(top)
+        return result["text"]
+    return _ui_call(run)
+
+
 # --------------------------------------------------------------------------
 # Core operations
 # --------------------------------------------------------------------------
@@ -166,29 +213,70 @@ def _ensure_located(interactive: bool) -> bool:
     return False
 
 
+def _count(results):
+    applied = sum(1 for _, a in results if a in ("updated", "added"))
+    skipped = sum(1 for _, a in results if a == "skipped_block")
+    return applied, skipped
+
+
 def apply_now(interactive: bool = True, notify: bool = True) -> bool:
+    """Apply the FOV plus (if enabled) all stored tweaks in one pass."""
     global _status_error
     if not _ensure_located(interactive):
         _refresh_icon()
         if interactive:
             _notify("Couldn't find gameinfo.gi. Use 'Locate gameinfo.gi…'.")
         return False
+
+    tw = _cfg["tweaks"]
+    apply_tw = bool(_cfg.get("apply_tweaks", True))
     try:
-        status, prev = gameinfo.patch(_path(), _cfg["fov_value"])
+        summary = gameinfo.apply_config(
+            _path(), _cfg["fov_value"],
+            convars=tw["convars"], scenesystem=tw["scenesystem"],
+            apply_tweaks=apply_tw,
+        )
+        video = {"changed": False, "created": False, "results": []}
+        if apply_tw and tw["video"]:
+            video = gameinfo.merge_video_cfg(
+                gameinfo.video_settings_path(_path()), tw["video"])
     except Exception as exc:  # noqa: BLE001
         _status_error = True
         _refresh_icon()
-        _notify(f"Failed to update file: {exc}")
+        _notify(f"Failed to update files: {exc}")
         return False
+
     _status_error = False
     if notify:
-        val = _cfg["fov_value"]
-        if status == gameinfo.ALREADY_OK:
-            _notify(f"FOV already set — r_aspectratio {_fov_label(val)}.")
-        else:
-            _notify(f"FOV applied — r_aspectratio {_fov_label(val)}.")
+        _notify(_apply_message(summary, video, apply_tw))
     _refresh_icon()
     return True
+
+
+def _apply_message(summary, video, apply_tw) -> str:
+    fov = _fov_label(_cfg["fov_value"])
+    changed = summary["changed"] or video["changed"]
+    lead = "Applied" if changed else "Already up to date"
+    parts = [f"FOV {fov}"]
+    if apply_tw:
+        cv_a, cv_s = _count(summary["convars"])
+        sc_a, sc_s = _count(summary["scenesystem"])
+        # cv includes the FOV entry; show tweak convars only.
+        extra = max(cv_a - 1, 0)
+        bits = []
+        if extra or _cfg["tweaks"]["convars"]:
+            bits.append(f"{extra} convars")
+        if _cfg["tweaks"]["scenesystem"]:
+            bits.append(f"{sc_a} scene")
+        if _cfg["tweaks"]["video"]:
+            va, _vs = _count(video["results"])
+            bits.append(f"{va} video" + (" (created)" if video.get("created") else ""))
+        if bits:
+            parts.append(" + ".join(bits))
+        skipped = cv_s + sc_s
+        if skipped:
+            parts.append(f"{skipped} skipped (nested)")
+    return f"{lead} — " + " · ".join(parts) + "."
 
 
 def check_now():
@@ -293,13 +381,80 @@ def _on_toggle_startup(icon, item):
     icon.update_menu()
 
 
+# --- Extra tweaks (pasted config) -----------------------------------------
+
+def _on_paste_import(icon, item):
+    text = _ask_paste()
+    if not text or not text.strip():
+        return
+    parsed = tweaks.parse(text)
+    tw = _cfg["tweaks"]
+    for sec in ("convars", "scenesystem", "video"):
+        existing = [tuple(x) for x in tw[sec]]
+        merged = tweaks.merge_lists(existing, parsed[sec])
+        tw[sec] = [[k, v] for k, v in merged]
+    fov_note = ""
+    if parsed.get("fov"):
+        norm = gameinfo.normalize_value(parsed["fov"])
+        if norm:
+            _cfg["fov_value"] = norm
+            fov_note = f"  FOV set to {_fov_label(norm)}."
+    config.save(_cfg)
+    _notify(f"Imported {tweaks.counts(parsed)}.{fov_note} Applying…")
+    apply_now(interactive=True, notify=True)
+    icon.update_menu()
+
+
+def _on_view_tweaks(icon, item):
+    tw = _cfg["tweaks"]
+    lines = ["DL-FOV-Fixer — stored tweaks", ""]
+    lines.append(f"FOV: r_aspectratio {_cfg['fov_value']}  ({_fov_label(_cfg['fov_value'])})")
+    lines.append(f"Apply extra tweaks: {'yes' if _cfg.get('apply_tweaks', True) else 'no'}")
+    for title, sec in (("ConVars", "convars"),
+                       ("SceneSystem", "scenesystem"),
+                       ("video.cfg", "video")):
+        lines.append("")
+        lines.append(f"[{title}]  ({len(tw[sec])})")
+        for k, v in tw[sec]:
+            lines.append(f"    {k}  {v}")
+    path = os.path.join(tempfile.gettempdir(), "dlfovfixer_tweaks.txt")
+    try:
+        with open(path, "w", encoding="utf-8") as fh:
+            fh.write("\n".join(lines))
+        os.startfile(path)  # type: ignore[attr-defined]
+    except OSError:
+        subprocess.Popen(["notepad.exe", path])
+
+
+def _on_clear_tweaks(icon, item):
+    if not _ask_yesno(
+        "Clear all stored extra tweaks?\n\n"
+        "This only clears them from DL-FOV-Fixer; it does NOT edit or remove "
+        "anything already in your gameinfo.gi."
+    ):
+        return
+    _cfg["tweaks"] = {"convars": [], "scenesystem": [], "video": []}
+    config.save(_cfg)
+    _notify("Cleared stored tweaks.")
+    icon.update_menu()
+
+
+def _on_toggle_tweaks(icon, item):
+    _cfg["apply_tweaks"] = not _cfg.get("apply_tweaks", True)
+    config.save(_cfg)
+    icon.update_menu()
+
+
 def _on_about(icon, item):
     _show_info(
         "DL-FOV-Fixer\n\n"
         "Keeps Deadlock's FOV fix (r_aspectratio in gameinfo.gi) applied,\n"
-        "and re-applies it after game updates wipe the file.\n\n"
+        "and re-applies it — plus any extra pasted config — after game\n"
+        "updates wipe the file.\n\n"
         f"File: {_path() or '(not located)'}\n"
         f"Target: r_aspectratio {_fov_label(_cfg['fov_value'])}\n"
+        f"Extra tweaks: {tweaks.counts(_cfg['tweaks'])} "
+        f"({'on' if _cfg.get('apply_tweaks', True) else 'off'})\n"
         f"Backup: {gameinfo.backup_path(_path()) if _have_file() else '(n/a)'}"
     )
 
@@ -336,6 +491,20 @@ def _build_menu() -> pystray.Menu:
     presets.append(pystray.Menu.SEPARATOR)
     presets.append(pystray.MenuItem("Custom value…", _on_custom))
 
+    tweaks_menu = pystray.Menu(
+        pystray.MenuItem(
+            lambda item: f"Stored: {tweaks.counts(_cfg['tweaks'])}", None, enabled=False),
+        pystray.Menu.SEPARATOR,
+        pystray.MenuItem("Paste / import config…", _on_paste_import),
+        pystray.MenuItem("View stored tweaks…", _on_view_tweaks),
+        pystray.MenuItem("Clear stored tweaks…", _on_clear_tweaks),
+        pystray.Menu.SEPARATOR,
+        pystray.MenuItem(
+            "Apply extra tweaks (not just FOV)", _on_toggle_tweaks,
+            checked=lambda item: _cfg.get("apply_tweaks", True),
+        ),
+    )
+
     return pystray.Menu(
         pystray.MenuItem(lambda item: f"{APP_TITLE} — {_status_text()}", None, enabled=False),
         pystray.MenuItem(
@@ -343,9 +512,10 @@ def _build_menu() -> pystray.Menu:
             None, enabled=False,
         ),
         pystray.Menu.SEPARATOR,
-        pystray.MenuItem("Apply FOV now", _on_apply, default=True),
+        pystray.MenuItem("Apply now", _on_apply, default=True),
         pystray.MenuItem("Check file now", _on_check),
         pystray.MenuItem("Set FOV value", pystray.Menu(*presets)),
+        pystray.MenuItem("Extra tweaks", tweaks_menu),
         pystray.Menu.SEPARATOR,
         pystray.MenuItem("Open gameinfo.gi", _on_open_file),
         pystray.MenuItem("Locate gameinfo.gi…", _on_locate),
@@ -406,12 +576,17 @@ def _schedule_periodic():
         global _status_error
         if _have_file() and _cfg.get("auto_apply_on_start", True):
             try:
-                status, _ = gameinfo.patch(_path(), _cfg["fov_value"])
+                tw = _cfg["tweaks"]
+                summary = gameinfo.apply_config(
+                    _path(), _cfg["fov_value"],
+                    convars=tw["convars"], scenesystem=tw["scenesystem"],
+                    apply_tweaks=bool(_cfg.get("apply_tweaks", True)),
+                )
                 _status_error = False
-                if status != gameinfo.ALREADY_OK:
+                if summary["changed"]:
                     _notify(
-                        f"Re-applied FOV after a game change — "
-                        f"r_aspectratio {_fov_label(_cfg['fov_value'])}."
+                        "Re-applied config after a game change — "
+                        f"FOV {_fov_label(_cfg['fov_value'])}."
                     )
             except Exception:  # noqa: BLE001 - never let the timer die loudly
                 _status_error = True

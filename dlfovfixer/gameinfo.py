@@ -135,19 +135,23 @@ def _matching_brace(text: str, open_idx: int) -> int:
     return -1
 
 
-def _convars_span(text: str):
-    """Return ``(open_brace_idx, close_brace_idx)`` of the ConVars block.
+def _block_span(text: str, name: str):
+    """Return ``(open_brace_idx, close_brace_idx)`` of a named KV block.
 
-    Returns ``None`` if there is no (balanced) ConVars block.
+    Matches the block header ``name`` (quoted or unquoted) as a whole word
+    followed by its ``{`` … ``}``. Returns ``None`` if not found (or unbalanced).
     """
-    for m in re.finditer(r"ConVars", text):
-        start = m.start()
-        # Must be a standalone token, not a substring of another word.
-        if start > 0 and (text[start - 1].isalnum() or text[start - 1] in "_\""):
+    for m in re.finditer(re.escape(name), text):
+        start, end = m.start(), m.end()
+        before = text[start - 1] if start > 0 else ""
+        after = text[end] if end < len(text) else ""
+        # Whole-word only (allow a leading/trailing quote for "Name").
+        if before.isalnum() or before == "_":
             continue
-        # Skip whitespace/newlines to find the block's opening brace.
-        j = m.end()
-        while j < len(text) and text[j] in " \t\r\n":
+        if after.isalnum() or after == "_":
+            continue
+        j = end
+        while j < len(text) and text[j] in ' \t\r\n"':
             j += 1
         if j < len(text) and text[j] == "{":
             close = _matching_brace(text, j)
@@ -156,17 +160,30 @@ def _convars_span(text: str):
     return None
 
 
+def _outer_block_span(text: str):
+    """Span of the first (outermost) ``{`` … ``}`` in the text, or ``None``."""
+    i = text.find("{")
+    if i == -1:
+        return None
+    close = _matching_brace(text, i)
+    return (i, close) if close != -1 else None
+
+
 # Matches a top-level ``"r_aspectratio" "value"`` pair (value on the same line).
 _ENTRY_RE = re.compile(r'"%s"[ \t]*"([^"]*)"' % re.escape(CONVAR_NAME))
+
+
+def _current_from_text(text: str):
+    span = _block_span(text, "ConVars")
+    block = text[span[0]:span[1] + 1] if span else text
+    m = _ENTRY_RE.search(block)
+    return m.group(1) if m else None
 
 
 def read_current(path: str):
     """Current r_aspectratio value in the file, or ``None`` if not set."""
     text, _ = _read(path)
-    span = _convars_span(text)
-    block = text[span[0]:span[1] + 1] if span else text
-    m = _ENTRY_RE.search(block)
-    return m.group(1) if m else None
+    return _current_from_text(text)
 
 
 def backup_path(path: str) -> str:
@@ -200,7 +217,7 @@ def patch(path: str, value: str, make_backup: bool = True):
     """
     value = normalize_value(value) or DEFAULT_VALUE
     text, nl = _read(path)
-    span = _convars_span(text)
+    span = _block_span(text, "ConVars")
     entry = '"%s"\t"%s"' % (CONVAR_NAME, value)
 
     if span is None:
@@ -239,3 +256,180 @@ def patch(path: str, value: str, make_backup: bool = True):
         _ensure_backup(path)
     _write(path, new_text)
     return status, prev
+
+
+# --------------------------------------------------------------------------
+# Generic block merging (for pasted ConVars / SceneSystem / video.cfg tweaks)
+# --------------------------------------------------------------------------
+
+def _fmt(key: str, value: str, quoted: bool) -> str:
+    return '"%s"\t"%s"' % (key, value) if quoted else "%s\t%s" % (key, value)
+
+
+def _merge_one(inner: str, key: str, value: str, quoted: bool):
+    """Apply one key=value to a block's inner text.
+
+    Returns ``(new_inner_or_None, action)`` where action is ``"updated"``,
+    ``"skipped_block"`` (key exists as a nested sub-block — left alone), or
+    ``"add"`` (caller should insert it).
+    """
+    kesc = re.escape(key)
+    if quoted:
+        m = re.search(r'("%s"[ \t]+)"[^"]*"' % kesc, inner)
+        if m:
+            return inner[:m.start()] + m.group(1) + '"%s"' % value + inner[m.end():], "updated"
+        if re.search(r'"%s"\s*\{' % kesc, inner):
+            return inner, "skipped_block"
+    else:
+        # NB: end with a lookahead for the line break (CRLF or LF) rather than
+        # ``$`` — a plain ``$`` fails on CRLF files because of the trailing \r.
+        m = re.search(
+            r'(?m)^([ \t]*%s[ \t]+)(\S+)([ \t]*)((?://[^\r\n]*)?)(?=\r?\n|\Z)' % kesc,
+            inner,
+        )
+        if m:
+            repl = m.group(1) + value + m.group(3) + m.group(4)
+            return inner[:m.start()] + repl + inner[m.end():], "updated"
+        if re.search(r'(?m)^[ \t]*%s\s*\{' % kesc, inner):
+            return inner, "skipped_block"
+    return None, "add"
+
+
+def merge_block(text: str, block_name: str, entries, quoted: bool, create: bool = True):
+    """Merge ``entries`` (``[(k, v), …]``) into a named block.
+
+    Existing simple keys are updated in place (comments preserved); missing keys
+    are inserted at the top of the block; keys that already exist as a nested
+    sub-block are skipped. Returns ``(new_text, results)`` with results as a list
+    of ``(key, action)``.
+    """
+    entries = list(entries)
+    if not entries:
+        return text, []
+    nl = "\r\n" if "\r\n" in text else "\n"
+    span = _block_span(text, block_name)
+
+    if span is None:
+        if not create:
+            return text, [(k, "no_block") for k, _ in entries]
+        outer = _outer_block_span(text)
+        if outer is None:
+            return text, [(k, "no_root") for k, _ in entries]
+        body = "".join("\t\t%s%s" % (_fmt(k, v, quoted), nl) for k, v in entries)
+        block = "\t%s%s\t{%s%s\t}%s\t" % (block_name, nl, nl, body, nl)
+        close = outer[1]
+        return text[:close] + block + text[close:], [(k, "added") for k, _ in entries]
+
+    open_i, close_i = span
+    head, inner, tail = text[:open_i + 1], text[open_i + 1:close_i], text[close_i:]
+    results, adds = [], []
+    for k, v in entries:
+        new_inner, action = _merge_one(inner, k, v, quoted)
+        if action == "add":
+            adds.append((k, v))
+            results.append((k, "added"))
+        else:
+            inner = new_inner
+            results.append((k, action))
+    if adds:
+        body = "".join("\t\t%s%s" % (_fmt(k, v, quoted), nl) for k, v in adds)
+        inner = nl + body + inner
+    return head + inner + tail, results
+
+
+def apply_config(path, fov_value, convars=None, scenesystem=None,
+                 apply_tweaks=True, make_backup=True):
+    """Ensure FOV plus (optionally) all pasted ConVars/SceneSystem tweaks.
+
+    Writes at most once; idempotent. Returns a summary dict.
+    """
+    convars = list(convars or [])
+    scenesystem = list(scenesystem or [])
+    text, _ = _read(path)
+    original = text
+    prev_fov = _current_from_text(text)
+
+    cv_entries = [(CONVAR_NAME, normalize_value(fov_value) or DEFAULT_VALUE)]
+    if apply_tweaks:
+        cv_entries += [(k, v) for k, v in convars if k != CONVAR_NAME]
+    text, cv_results = merge_block(text, "ConVars", cv_entries, quoted=True, create=True)
+
+    sc_results = []
+    if apply_tweaks and scenesystem:
+        text, sc_results = merge_block(text, "SceneSystem", scenesystem,
+                                       quoted=False, create=True)
+
+    changed = text != original
+    if changed:
+        if make_backup:
+            _ensure_backup(path)
+        _write(path, text)
+    return {
+        "changed": changed,
+        "prev_fov": prev_fov,
+        "convars": cv_results,
+        "scenesystem": sc_results,
+    }
+
+
+# --------------------------------------------------------------------------
+# video settings (optional; cfg/video.txt next to gameinfo.gi)
+# --------------------------------------------------------------------------
+
+def video_settings_path(gameinfo_path: str) -> str:
+    return os.path.join(os.path.dirname(gameinfo_path), "cfg", "video.txt")
+
+
+def merge_video_cfg(path, entries, make_backup=True, create=True):
+    """Merge ``setting.*`` entries into the video settings file (video.txt),
+    creating it if needed."""
+    entries = list(entries)
+    if not entries:
+        return {"changed": False, "created": False, "results": []}
+
+    if not os.path.isfile(path):
+        if not create:
+            return {"changed": False, "created": False, "results": []}
+        nl = "\r\n"
+        body = "".join('\t"%s"\t\t"%s"%s' % (k, v, nl) for k, v in entries)
+        text = '"video.cfg"%s{%s%s}%s' % (nl, nl, body, nl)
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        _write(path, text)
+        return {"changed": True, "created": True,
+                "results": [(k, "added") for k, _ in entries]}
+
+    text, nl = _read(path)
+    original = text
+    span = _outer_block_span(text)
+    if span is None:
+        # No block to merge into; wrap a fresh one.
+        body = "".join('\t"%s"\t\t"%s"%s' % (k, v, nl) for k, v in entries)
+        text = '"video.cfg"%s{%s%s}%s' % (nl, nl, body, nl)
+        if make_backup:
+            _ensure_backup(path)
+        _write(path, text)
+        return {"changed": True, "created": False,
+                "results": [(k, "added") for k, _ in entries]}
+
+    open_i, close_i = span
+    head, inner, tail = text[:open_i + 1], text[open_i + 1:close_i], text[close_i:]
+    results, adds = [], []
+    for k, v in entries:
+        new_inner, action = _merge_one(inner, k, v, quoted=True)
+        if action == "add":
+            adds.append((k, v))
+            results.append((k, "added"))
+        else:
+            inner = new_inner
+            results.append((k, action))
+    if adds:
+        body = "".join('\t"%s"\t\t"%s"%s' % (k, v, nl) for k, v in adds)
+        inner = nl + body + inner
+    text = head + inner + tail
+
+    changed = text != original
+    if changed:
+        if make_backup:
+            _ensure_backup(path)
+        _write(path, text)
+    return {"changed": changed, "created": False, "results": results}
