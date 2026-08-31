@@ -8,7 +8,7 @@ version = "1.0.0"
 description = "Tray app that keeps Deadlock's FOV (r_aspectratio in gameinfo.gi) applied across game updates."
 readme = "README.md"
 requires-python = ">=3.9"
-license = { file = "LICENSE" }
+license = { file = "LICENSE.md" }
 authors = [{ name = "Lukáš Krejčí" }]
 dependencies = [
     "pystray>=0.19.4",

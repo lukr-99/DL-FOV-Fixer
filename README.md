@@ -122,10 +122,13 @@ sub-blocks survive untouched.
 
 ## Notes & safety
 
-- Only the single `r_aspectratio` line is ever changed; the file is otherwise
-  byte-for-byte preserved (newlines included).
-- A backup is created the first time the file is modified. **Restore** it by
-  copying `gameinfo.gi.dlfovfixer.bak` back over `gameinfo.gi`.
+- Only the keys you set are changed — the FOV plus any tweaks you import.
+  Existing keys are updated in place (comments kept), the rest of the file is
+  preserved byte-for-byte (newlines included), and nested sub-blocks are never
+  rewritten.
+- A one-time backup (`gameinfo.gi.dlfovfixer.bak`, and `video.txt.dlfovfixer.bak`
+  if applicable) is made the first time each file is modified. **Restore** it by
+  copying the `.bak` back over the original.
 - This edits your own local game files; it doesn't touch anything online and is
   unrelated to anti-cheat. Use at your own discretion.
 - Not affiliated with Valve. "Deadlock" is a trademark of Valve Corporation.
