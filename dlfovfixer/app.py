@@ -240,6 +240,21 @@ def apply_now(interactive: bool = True, notify: bool = True) -> bool:
         if apply_tw and tw["video"]:
             video = gameinfo.merge_video_cfg(
                 gameinfo.video_settings_path(_path()), tw["video"])
+    except PermissionError as exc:
+        # A sharing/lock violation just means the game (or a mod manager) has
+        # the file open right now — transient, not a real failure. It'll be
+        # re-applied on the next pass once the file is free.
+        if getattr(exc, "winerror", None) in (32, 33):
+            _status_error = False
+            if interactive:
+                _notify("File is in use (is Deadlock running?). It'll apply "
+                        "automatically once the game is closed.")
+            _refresh_icon()
+            return False
+        _status_error = True
+        _refresh_icon()
+        _notify(f"Failed to update files: {exc}")
+        return False
     except Exception as exc:  # noqa: BLE001
         _status_error = True
         _refresh_icon()
@@ -588,6 +603,10 @@ def _schedule_periodic():
                         "Re-applied config after a game change — "
                         f"FOV {_fov_label(_cfg['fov_value'])}."
                     )
+            except PermissionError as exc:
+                # File locked (game running) — leave status as-is and retry later.
+                if getattr(exc, "winerror", None) not in (32, 33):
+                    _status_error = True
             except Exception:  # noqa: BLE001 - never let the timer die loudly
                 _status_error = True
         _refresh_icon()
