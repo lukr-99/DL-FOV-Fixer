@@ -22,6 +22,7 @@ DEFAULTS = {
     "auto_apply_on_start": True,  # re-apply automatically when the app launches
     "periodic_check_minutes": 10, # re-check while running (0 disables)
     "start_with_windows": False,  # launch on Windows sign-in
+    "check_updates_on_start": True, # check GitHub Releases when the app launches
     # Extra pasted config, re-applied alongside the FOV so a game update can't
     # wipe it. Each is an ordered list of [key, value] pairs.
     "tweaks": {"convars": [], "scenesystem": [], "video": []},

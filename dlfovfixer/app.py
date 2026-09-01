@@ -24,7 +24,7 @@ from tkinter import filedialog, messagebox, simpledialog
 
 import pystray
 
-from . import config, gameinfo, iconfactory, locator, startup, tweaks
+from . import config, gameinfo, iconfactory, locator, startup, tweaks, updater
 
 APP_TITLE = "DL FOV Fixer"
 
@@ -33,6 +33,8 @@ _icon: "pystray.Icon | None" = None
 _root: "tk.Tk | None" = None
 _periodic_job = None
 _status_error = False  # set when a locate/read/write actually fails
+_latest_update: "updater.ReleaseInfo | None" = None
+_update_checking = False
 
 
 # --------------------------------------------------------------------------
@@ -109,6 +111,19 @@ def _ask_yesno(message: str) -> bool:
     return bool(_ui_call(
         lambda: messagebox.askyesno(APP_TITLE, message, parent=_dialog_parent())
     ))
+
+
+def _ask_update(release: updater.ReleaseInfo) -> bool:
+    size = ""
+    if release.asset.size:
+        size = f"\nDownload: {release.asset.size / 1024 / 1024:.1f} MB"
+    return _ask_yesno(
+        f"{release.name} is available.\n\n"
+        f"Current version: {updater.current_version()}\n"
+        f"New version: {release.tag}\n"
+        f"Asset: {release.asset.name}{size}\n\n"
+        "Download and install it now?"
+    )
 
 
 def _ask_paste():
@@ -315,6 +330,60 @@ def check_now():
     _refresh_icon()
 
 
+def check_updates(interactive: bool = True):
+    """Check GitHub Releases in the background."""
+    global _latest_update, _update_checking
+    if _update_checking:
+        if interactive:
+            _notify("Update check is already running.")
+        return
+    _update_checking = True
+    if _icon is not None:
+        _icon.update_menu()
+
+    def worker():
+        global _latest_update, _update_checking
+        try:
+            release = updater.latest_release()
+            _latest_update = release
+            if release is None:
+                if interactive:
+                    _notify(f"No update found. Current version is {updater.current_version()}.")
+                return
+            _notify(f"Update available: {release.name}.")
+            if interactive and _ask_update(release):
+                install_update(release)
+        except Exception as exc:  # noqa: BLE001
+            if interactive:
+                _notify(f"Update check failed: {exc}")
+        finally:
+            _update_checking = False
+            if _icon is not None:
+                _icon.update_menu()
+
+    threading.Thread(target=worker, name="update-check", daemon=True).start()
+
+
+def install_update(release: "updater.ReleaseInfo | None" = None):
+    """Download and launch the release installer/self-replacement helper."""
+    release = release or _latest_update
+    if release is None:
+        _notify("No update is available yet. Use 'Check for updates' first.")
+        return
+
+    def worker():
+        try:
+            downloaded = updater.download_asset(release)
+            updater.install_downloaded_exe(downloaded)
+            if _root is not None:
+                _root.after(0, _root.quit)
+        except Exception as exc:  # noqa: BLE001
+            _notify(f"Update install failed: {exc}")
+
+    _notify(f"Downloading {release.asset.name}...")
+    threading.Thread(target=worker, name="update-install", daemon=True).start()
+
+
 def set_value(value: str, apply: bool = True):
     norm = gameinfo.normalize_value(value)
     if norm is None:
@@ -396,6 +465,20 @@ def _on_toggle_startup(icon, item):
     icon.update_menu()
 
 
+def _on_check_updates(icon, item):
+    check_updates(interactive=True)
+
+
+def _on_install_update(icon, item):
+    install_update()
+
+
+def _on_toggle_update_check(icon, item):
+    _cfg["check_updates_on_start"] = not _cfg.get("check_updates_on_start", True)
+    config.save(_cfg)
+    icon.update_menu()
+
+
 # --- Extra tweaks (pasted config) -----------------------------------------
 
 def _on_paste_import(icon, item):
@@ -470,6 +553,7 @@ def _on_about(icon, item):
         f"Target: r_aspectratio {_fov_label(_cfg['fov_value'])}\n"
         f"Extra tweaks: {tweaks.counts(_cfg['tweaks'])} "
         f"({'on' if _cfg.get('apply_tweaks', True) else 'off'})\n"
+        f"Update checks: {'on' if _cfg.get('check_updates_on_start', True) else 'off'}\n"
         f"Backup: {gameinfo.backup_path(_path()) if _have_file() else '(n/a)'}"
     )
 
@@ -532,6 +616,23 @@ def _build_menu() -> pystray.Menu:
         pystray.MenuItem("Set FOV value", pystray.Menu(*presets)),
         pystray.MenuItem("Extra tweaks", tweaks_menu),
         pystray.Menu.SEPARATOR,
+        pystray.MenuItem(
+            lambda item: "Checking for updates..."
+            if _update_checking else "Check for updates",
+            _on_check_updates,
+            enabled=lambda item: not _update_checking,
+        ),
+        pystray.MenuItem(
+            lambda item: f"Install update {_latest_update.tag}"
+            if _latest_update else "Install update",
+            _on_install_update,
+            enabled=lambda item: _latest_update is not None,
+        ),
+        pystray.MenuItem(
+            "Check updates on start", _on_toggle_update_check,
+            checked=lambda item: _cfg.get("check_updates_on_start", True),
+        ),
+        pystray.Menu.SEPARATOR,
         pystray.MenuItem("Open gameinfo.gi", _on_open_file),
         pystray.MenuItem("Locate gameinfo.gi…", _on_locate),
         pystray.Menu.SEPARATOR,
@@ -576,6 +677,8 @@ def _on_setup(icon):
     _first_run_setup()
     if _cfg.get("auto_apply_on_start", True):
         apply_now(interactive=False, notify=True)
+    if _cfg.get("check_updates_on_start", True):
+        check_updates(interactive=False)
     _refresh_icon()
     _schedule_periodic()
     icon.update_menu()

@@ -47,6 +47,7 @@ The tray icon changes color so you can tell the state without opening the menu:
 | **Locate gameinfo.gi…** | Manually point the app at the file. |
 | **Apply automatically on start** | Toggle auto-apply when the app launches. |
 | **Start with Windows** | Toggle launch at sign-in (per-user `Run` key). |
+| **Check for updates** | Look for a newer public GitHub Release and install its `.exe` asset. |
 | **Quit** | Exit. |
 
 ## Extra tweaks — paste a whole config
@@ -109,6 +110,25 @@ build.bat
 Produces `dist\DL-FOV-Fixer.exe` — a single-file, no-console tray app with the
 bundled icon. Drop it anywhere and (optionally) enable **Start with Windows**
 from the tray menu.
+
+## Releases and updates
+
+The app checks `https://api.github.com/repos/lukr-99/DL-FOV-Fixer/releases/latest`
+for a newer non-draft, non-prerelease GitHub Release. The release must include a
+Windows `.exe` asset, preferably named `DL-FOV-Fixer.exe`.
+
+To publish an update:
+
+```bash
+# 1. Bump the version in dlfovfixer/__init__.py and pyproject.toml.
+# 2. Commit the version bump.
+git tag v1.1.0
+git push origin v1.1.0
+```
+
+The release workflow runs tests, builds `dist\DL-FOV-Fixer.exe`, and attaches it
+to the GitHub Release. Installed copies check for updates on start by default,
+and users can also trigger **Check for updates** from the tray menu.
 
 ## Tests
 
