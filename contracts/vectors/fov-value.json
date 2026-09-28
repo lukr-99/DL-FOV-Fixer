@@ -68,6 +68,30 @@
     {
       "input": "2.",
       "expected": "2."
+    },
+    {
+      "input": "0_6",
+      "expected": null
+    },
+    {
+      "input": "２",
+      "expected": null
+    },
+    {
+      "input": "2e0",
+      "expected": "2e0"
+    },
+    {
+      "input": "+2",
+      "expected": "+2"
+    },
+    {
+      "input": "2.1.5",
+      "expected": null
+    },
+    {
+      "input": "1,5",
+      "expected": "1.5"
     }
   ],
   "toDegrees": [

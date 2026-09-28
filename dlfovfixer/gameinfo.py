@@ -33,6 +33,10 @@ BACKUP_SUFFIX = ".dlfovfixer.bak"
 _FOV_SLOPE = 28.0
 _FOV_INTERCEPT = 31.0
 
+# A plain decimal number, as typed: optional sign, digits with an optional
+# point, and an optional exponent. ASCII only, and no underscores.
+_NUMBER_RE = re.compile(r"[+-]?(?:[0-9]+\.?[0-9]*|\.[0-9]+)(?:[eE][+-]?[0-9]+)?\Z")
+
 # Handy presets shown in the tray menu: (degrees, r_aspectratio string).
 PRESETS = [
     (80, "1.75"),
@@ -72,7 +76,9 @@ def normalize_value(raw) -> str | None:
     if raw is None:
         return None
     text = str(raw).strip().replace(",", ".")
-    if not text:
+    # float() alone also takes "0_6" and non-ASCII digits, which would then be
+    # written into gameinfo.gi as typed. Only a plain ASCII number gets through.
+    if not _NUMBER_RE.match(text):
         return None
     try:
         num = float(text)
