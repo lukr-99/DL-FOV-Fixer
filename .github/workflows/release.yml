@@ -31,6 +31,32 @@ jobs:
         shell: cmd
         run: build.bat
 
+      # PyInstaller output is the case where signing matters most: the bootloader pattern is what
+      # Defender heuristics match, so unsigned builds get reported as trojans outright rather than
+      # merely warned about. Until a certificate exists this warns and continues; once
+      # WINDOWS_CERT_PFX_BASE64 is set it signs and verifies. Add -Require then.
+      # See CodePrint docs/release-signing.md.
+      - name: Sign executable
+        shell: pwsh
+        env:
+          WINDOWS_CERT_PFX_BASE64: ${{ secrets.WINDOWS_CERT_PFX_BASE64 }}
+          WINDOWS_CERT_PASSWORD: ${{ secrets.WINDOWS_CERT_PASSWORD }}
+        run: >-
+          ./tools/sign-windows-artifacts.ps1
+          -Path 'dist/DL-FOV-Fixer.exe'
+          -Description 'DL-FOV-Fixer'
+          -DescriptionUrl 'https://github.com/lukr-99/DL-FOV-Fixer'
+
+      - name: Report signing status
+        if: always()
+        shell: pwsh
+        run: |
+          # if: always() means this also runs when the build failed, so the file may not exist.
+          if (Test-Path 'dist/DL-FOV-Fixer.exe') {
+            $status = (Get-AuthenticodeSignature -LiteralPath 'dist/DL-FOV-Fixer.exe').Status
+            "DL-FOV-Fixer.exe signature: $status" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append
+          }
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v3
         with:
