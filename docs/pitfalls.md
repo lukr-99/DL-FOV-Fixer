@@ -19,6 +19,26 @@ came from a tool or platform trap. Put new entries at the top, in this shape:
 A pitfall that could hit another repository is also reported to CodePrint. CodePrint's
 `docs/pitfalls/README.md` explains how.
 
+## Replacing a file the game holds open says "access denied", not "in use"
+
+- Symptom:
+
+  ```text
+  System.UnauthorizedAccessException: Access to the path '...\gameinfo.gi' is denied.
+  ```
+
+  from `File.Move(temp, path, overwrite: true)` while Deadlock is running. It maps to a red Failed
+  state instead of Waiting, although nothing is wrong except that the game has the file open.
+- Cause: moving over a file that another process has open fails with Win32 error 5, access denied,
+  whatever share mode that process used. `File.Replace` on the same file fails with error 32, the
+  sharing violation that means Waiting. Measured on Windows 11 with .NET 10: with the file open for
+  reading and `FileShare.Read`, `File.Move` gives 5 and `File.Replace` gives 32.
+- Fix: replace an existing file with `File.Replace(temp, path, null)`, and use `File.Move` only when
+  the target does not exist yet.
+- Closed off by: `FileSystemGameFilesTests.WriteText_FileOpenInTheGame_IsLockedAndLeavesTheFileAlone`
+  with `FileShare.Read`, which fails if `File.Replace` is swapped back for `File.Move`.
+- Seen: 2026-09-29, M4, while writing `FileSystemGameFiles`, before it shipped.
+
 ## A PyInstaller one-file build is reported as a trojan
 
 - Symptom: Windows Defender reports `DL-FOV-Fixer.exe` as a trojan and removes it, on the build
@@ -64,8 +84,10 @@ A pitfall that could hit another repository is also reported to CodePrint. CodeP
 - Fix: treat those two error numbers as a transient waiting state. Keep the last known status, retry
   on the next tick, and say "file is in use (is Deadlock running?)" when the user asked for the apply
   explicitly. Any other permission error is still a real error.
-- Closed off by: not yet. The C# port makes it the named `Waiting` state, with a test that opens the
-  file with `FileShare.None`.
+- Closed off by: in the C# port, `FileSystemGameFiles` reports errors 32 and 33 as a locked file and
+  `ApplyService` turns that into `ApplyResult.Waiting`. `FileSystemGameFilesTests` opens the file with
+  `FileShare.None` and `FileShare.Read`, and `ApplyServiceTests.Apply_GameHasTheFileOpen_IsWaiting`
+  covers the mapping. The Python app still handles it by hand in `app.py`.
 - Seen: 2026-09, commit 887fe47.
 
 ## The `python` command writes to a private copy of AppData
