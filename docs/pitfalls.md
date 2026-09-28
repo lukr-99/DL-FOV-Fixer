@@ -42,8 +42,11 @@ A pitfall that could hit another repository is also reported to CodePrint. CodeP
 - Cause: in Python's `re`, `$` under `MULTILINE` matches only right before `\n`. On CRLF text the
   `\r` sits between the value and the `\n`, and `\r` counts as whitespace, so `(\S+)[ \t]*$` stops
   before the `\r` and then cannot match.
-- Fix: end the pattern with a line-break lookahead, `(?=\r?\n|\Z)`, instead of `$`.
-- Closed off by: `tests/test_tweaks.py::test_scenesystem_update_crlf`.
+- Fix: end the pattern with a line-break lookahead, `(?=\r?\n|\Z)`, instead of `$`. In .NET write
+  `\z`, because .NET's `\Z` also matches before a final `\n`.
+- Closed off by: the CRLF form of every case in `contracts/vectors/gameinfo-merge.json` and
+  `gameinfo-apply.json`, run by `tests/test_vectors.py` and by `DlFovFixer.Core.Tests`. Removing the
+  `\r?` from the C# lookahead fails four of them.
 - Seen: 2026-09, in `gameinfo._merge_one`.
 
 ## A locked gameinfo.gi is a normal state, not an error
