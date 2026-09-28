@@ -102,9 +102,21 @@ other layers, WPF, the registry and the network, and keep Infrastructure free of
 
 `DlFovFixer.Core/GameInfo` holds the ported merge as pure text functions: `BlockMerge` for one
 block, `GameInfoMerge` for the value and the tweaks together, `VideoConfigMerge` for `video.txt`,
-`TweakTextParser` for pasted configs and `AspectRatio` for typed values. Reading and writing files is
-not there; it arrives with the adapters. The shared vectors in `contracts/vectors/` define the
-behavior, and the Python tests and the Core tests both run them.
+`TweakTextParser` for pasted configs and `AspectRatio` for typed values. The shared vectors in
+`contracts/vectors/` define the behavior, and the Python tests and the Core tests both run them.
+
+`Core/Applying/ApplyService` is the apply use case. It reads through `IGameFiles`, merges, and writes
+only a file whose text changed. A file the game holds open ends as `Waiting`, not `Failed`. Core
+also owns the ports `ISettingsStore`, `IGameInfoLocator` and `ISignInStartup`. `DlFovFixer.Infrastructure`
+implements all four:
+
+- `FileSystemGameFiles`: UTF-8 without adding a byte-order mark, the one-time backup before the
+  first change, and a write through a temporary file and `File.Replace`.
+- `JsonSettingsStore`: the 1.0 `config.json`, read as forgivingly as 1.0 read it, plus
+  `schemaVersion` on save. A checked-in file written by 1.0.0 is its test fixture.
+- `SteamGameInfoLocator`: the registry, the common Steam folders and `libraryfolders.vdf`, behind
+  `IRegistryReader` so tests never touch the real registry.
+- `WindowsSignInStartup`: the `DL-FOV-Fixer` Run value, behind `IRunValues`.
 
 `.github/workflows/ci.yml` runs on every pull request and every push to `main`. It checks .NET
 formatting, builds with warnings as errors, runs the .NET tests with TRX results uploaded even on

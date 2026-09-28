@@ -1,7 +1,7 @@
 # Plan: rewrite DL-FOV-Fixer in C#
 
-Status: M2 (scaffold) and M3 (the merge in Core, against shared vectors) are in place. The C# app
-does not run yet. The Python tray app in `dlfovfixer/` is still what ships, and it stays on `main`
+Status: M2 (scaffold), M3 (the merge in Core, against shared vectors) and M4 (the Windows adapters
+and the apply use case) are in place. The C# app does not run yet: the tray shell is M5. The Python tray app in `dlfovfixer/` is still what ships, and it stays on `main`
 until the C# app does everything it does.
 
 ## Why
