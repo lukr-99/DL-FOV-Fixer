@@ -55,6 +55,9 @@ Cover a change to that code with a vector in `contracts/vectors/`, not only with
 
 ```powershell
 py -m pytest -q
+dotnet format DL-FOV-Fixer.slnx --verify-no-changes
+dotnet build DL-FOV-Fixer.slnx -c Release
+dotnet test --solution DL-FOV-Fixer.slnx -c Release --no-build
 py ..\CodePrint\tools\validate_repository.py --root .
 ```
 

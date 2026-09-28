@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- The WPF tray shell and the only composition root. -->
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <RootNamespace>DlFovFixer.App</RootNamespace>
+    <!-- The same file name as the 1.x executable. -->
+    <AssemblyName>DL-FOV-Fixer</AssemblyName>
+    <ApplicationIcon>$(RepositoryRoot)assets\icon.ico</ApplicationIcon>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="DlFovFixer.App.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\DlFovFixer.Core\DlFovFixer.Core.csproj" />
+    <ProjectReference Include="..\DlFovFixer.Infrastructure\DlFovFixer.Infrastructure.csproj" />
+  </ItemGroup>
+</Project>
