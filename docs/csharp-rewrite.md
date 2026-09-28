@@ -1,8 +1,8 @@
 # Plan: rewrite DL-FOV-Fixer in C#
 
-Status: the M2 scaffold is in place. The solution, its three projects and CI exist, and nothing from the Python
-app is ported yet. The Python tray app in `dlfovfixer/` is still what ships, and it stays on `main`
-until the C# app passes the same behavior vectors.
+Status: M2 (scaffold) and M3 (the merge in Core, against shared vectors) are in place. The C# app
+does not run yet. The Python tray app in `dlfovfixer/` is still what ships, and it stays on `main`
+until the C# app does everything it does.
 
 ## Why
 
@@ -83,16 +83,15 @@ nothing. `App` owns the only composition root (`Composition/AppGraph.cs`).
 
 | Today (Python) | Becomes | Project |
 |---|---|---|
-| `gameinfo.py` brace matching, block spans, comment and quote handling | `GameInfo/KeyValuesText.cs` | Core |
-| `gameinfo.py` `merge_block`, `_merge_one` | `GameInfo/BlockMerge.cs`, `MergeAction.cs`, `MergeOutcome.cs` | Core |
-| `gameinfo.py` `patch` and its result codes | `GameInfo/GameInfoPatch.cs`, `PatchOutcome.cs` | Core |
-| `gameinfo.py` `normalize_value`, `aspect_to_fov`, `fov_to_aspect`, `PRESETS` | `GameInfo/AspectRatio.cs`, `FovDegrees.cs`, `FovPreset.cs`, `FovPresets.cs` | Core |
-| `gameinfo.py` `merge_video_cfg`, `video_settings_path` | `GameInfo/VideoConfigMerge.cs` | Core |
-| `gameinfo.py` `apply_config` | `Applying/ApplyService.cs`, `ApplyOutcome.cs` | Core |
+| `gameinfo.py` brace matching, block spans, comment and quote handling | `GameInfo/KeyValuesText.cs`, `BlockSpan.cs` | Core |
+| `gameinfo.py` `merge_block`, `_merge_one` | `GameInfo/BlockMerge.cs`, `MergeAction.cs`, `KeyMerge.cs`, `BlockMergeOutcome.cs` | Core |
+| `gameinfo.py` `normalize_value`, `aspect_to_fov`, `PRESETS` | `GameInfo/AspectRatio.cs`, `FovPreset.cs`, `FovPresets.cs` | Core |
+| `gameinfo.py` `merge_video_cfg` | `GameInfo/VideoConfigMerge.cs`, `VideoConfigOutcome.cs` | Core |
+| `gameinfo.py` `apply_config`, `read_current` | `GameInfo/GameInfoMerge.cs`, `GameInfoMergeOutcome.cs` for the text, `Applying/ApplyService.cs` for reading and writing (M4) | Core |
 | `app.py` `_compute_status` | `Applying/StatusProbe.cs`, `FixState.cs`, `FixStatus.cs` | Core |
-| `tweaks.py` `parse`, `_route`, `merge_lists` | `GameInfo/TweakTextParser.cs`, `TweakSet.cs`, `TweakEntry.cs`, `TweakSection.cs` | Core |
+| `tweaks.py` `parse`, `_route`, `merge_lists` | `GameInfo/TweakTextParser.cs`, `ParsedTweaks.cs`, `TweakEntry.cs` | Core |
 | `updater.py` version compare and asset choice | `Updates/SemanticVersion.cs`, `UpdatePolicy.cs`, `ReleaseManifest.cs`, `ReleaseManifestParser.cs`, `ReleaseChannelAddress.cs`, `UpdateService.cs` | Core |
-| `gameinfo.py` `_read`, `_write`, `_ensure_backup`, `restore_backup` | `GameFiles/FileSystemGameFiles.cs` behind `Core/Applying/IGameFiles.cs` | Infrastructure |
+| `gameinfo.py` `_read`, `_write`, `_ensure_backup`, `restore_backup`, `video_settings_path` | `GameFiles/FileSystemGameFiles.cs` behind `Core/Applying/IGameFiles.cs` | Infrastructure |
 | `locator.py` | `Locating/SteamGameInfoLocator.cs`, `SteamLibraries.cs` behind `Core/Locating/IGameInfoLocator.cs` | Infrastructure |
 | `config.py` | `Settings/JsonSettingsStore.cs`, `SettingsDocument.cs` behind `Core/Settings/ISettingsStore.cs` | Infrastructure |
 | `startup.py` | `Startup/WindowsSignInStartup.cs` behind `Core/Startup/ISignInStartup.cs` | Infrastructure |
@@ -101,24 +100,29 @@ nothing. `App` owns the only composition root (`Composition/AppGraph.cs`).
 | `app.py` tray icon, menu, dialogs, timer | `Shell/`, `Views/`, `ViewModels/`, `Startup/` | App |
 | `run.pyw`, `__main__.py` | `App.xaml.cs` plus `Composition/AppGraph.cs` | App |
 
+`patch()` and `fov_to_aspect()` are not ported. Only the Python tests call them: the app applies
+through `apply_config()` and never converts degrees back to a value.
+
 The shapes for the update seam, the tray icon, single instance and the Run key follow GoalMaker's
 `windows/src` (inspected 2026-09-28). They are reimplemented here, not copied.
 
 ## Behavior vectors instead of a rewritten test suite
 
 The merge logic is the only part of this app that can break someone's game, so it does not get a
-fresh set of hand-written C# tests. The 13 existing Python test cases become data in
-`contracts/vectors/`, and both implementations read the same files:
+fresh set of hand-written C# tests. The Python test cases became data in `contracts/vectors/`, and
+both implementations read the same files ([contracts/vectors/README.md](../contracts/vectors/README.md)):
 
 ```text
 contracts/vectors/
-  gameinfo-patch.json          input text, target value, expected output text, expected status
   gameinfo-merge.json          multi-key merges, including nested sub-blocks and comments
+  gameinfo-apply.json          the value and the tweaks applied to a whole file
   video-config.json            create and merge cases for cfg/video.txt
   tweak-parsing.json           pasted blobs and the routed, de-duplicated result
-  semantic-version.json        version compare and the offer policy
-  release-channel.json         which artifact paths are allowed and which must be refused
+  fov-value.json               accepted values, degrees and the presets
 ```
+
+The update slice (M6) adds `semantic-version.json` for version compare and the offer policy, and
+`release-channel.json` for which artifact paths are allowed and which must be refused.
 
 Cases the current Python tests do not cover, added while writing the vectors because they are the
 ways this code has actually gone wrong before:
@@ -129,6 +133,8 @@ ways this code has actually gone wrong before:
 - A file whose only closing brace is the root one, and a file with no root block at all.
 - A value with a trailing `//` comment on the same line, which must survive an update in place.
 - A second apply straight after the first, asserting that no write happened.
+- Typed values that Python's `float()` takes and .NET does not, like `0_6` and full-width digits.
+  Both now accept only a plain ASCII number, so neither can write such a value into the file.
 
 The Python tests keep running from these vectors until `dlfovfixer/` is removed, which is what makes
 the port verifiable rather than hopeful.

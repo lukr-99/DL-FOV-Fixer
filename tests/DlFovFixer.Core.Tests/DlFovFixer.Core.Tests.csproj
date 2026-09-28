@@ -14,6 +14,13 @@
     <Using Include="Xunit" />
   </ItemGroup>
 
+  <!-- The shared behavior vectors, read by these tests and by the Python tests alike. -->
+  <ItemGroup>
+    <None Include="$(RepositoryRoot)contracts\vectors\*.json"
+          Link="vectors\%(Filename)%(Extension)"
+          CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
   <ItemGroup>
     <!-- xUnit v3 on Microsoft.Testing.Platform (global.json). -->
     <PackageReference Include="xunit.v3" Version="4.0.1" />
