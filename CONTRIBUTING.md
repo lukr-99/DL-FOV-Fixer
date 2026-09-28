@@ -2,14 +2,20 @@
 
 ## Local verification
 
-Run what your change touches. The release workflow runs the tests on a `v*` tag; there is no pull
-request workflow yet, which the C# scaffold slice adds.
+Run what your change touches. CI (`.github/workflows/ci.yml`) runs the same checks on every pull
+request, and the release workflow runs the Python tests again on a `v*` tag.
 
 ```powershell
 py -m pip install -r requirements.txt
 py -m pytest -q
+dotnet format DL-FOV-Fixer.slnx --verify-no-changes
+dotnet build DL-FOV-Fixer.slnx -c Release
+dotnet test --solution DL-FOV-Fixer.slnx -c Release --no-build
 py ..\CodePrint\tools\validate_repository.py --root .
 ```
+
+The .NET SDK is pinned in `global.json`. The C# app's version lives in `version.properties`, and a
+build is `-dev` unless it is made with `-p:DlFovFixerReleaseBuild=true`.
 
 Use `py`, never `python`. The `python` command can resolve to the Microsoft Store build, which writes
 to a private copy of `%APPDATA%` (see [docs/pitfalls.md](docs/pitfalls.md)).

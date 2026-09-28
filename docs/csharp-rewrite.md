@@ -1,7 +1,8 @@
 # Plan: rewrite DL-FOV-Fixer in C#
 
-Status: planned. Nothing here is built yet. The Python tray app in `dlfovfixer/` is still what
-ships, and it stays on `main` until the C# app passes the same behavior vectors.
+Status: the M2 scaffold is in place. The solution, its three projects and CI exist, and nothing from the Python
+app is ported yet. The Python tray app in `dlfovfixer/` is still what ships, and it stays on `main`
+until the C# app passes the same behavior vectors.
 
 ## Why
 

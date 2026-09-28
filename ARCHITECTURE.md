@@ -85,9 +85,21 @@ Where this repository does not yet meet the CodePrint baseline:
 - `app.py` is both the host and the coordinator. It holds module-level state and imports every other
   module directly, so there are no injected seams and the automated tests only cover the pure parts
   (`gameinfo`, `tweaks`, and the updater's version comparison).
-- Tests run only in the release workflow. There is no CI workflow on pull requests.
 - There is no theme support. `pystray` menus and `tkinter` dialogs follow neither a light nor a dark
   token set.
 
 These are the gaps the rewrite is meant to close, and the plan lists them as slices rather than
 leaving them implied.
+
+## The C# port in progress
+
+The .NET solution `DL-FOV-Fixer.slnx` sits beside the Python app and ships nothing yet. It has the
+three projects from [docs/csharp-rewrite.md](docs/csharp-rewrite.md): `DlFovFixer.Core` on `net10.0`,
+and `DlFovFixer.Infrastructure` and `DlFovFixer.App` on `net10.0-windows`, each with a test project.
+`Directory.Build.props` reads the version from `version.properties` and marks every build `-dev`
+unless it is built with `-p:DlFovFixerReleaseBuild=true`. Architecture tests keep Core free of the
+other layers, WPF, the registry and the network, and keep Infrastructure free of the shell.
+
+`.github/workflows/ci.yml` runs on every pull request and every push to `main`. It checks .NET
+formatting, builds with warnings as errors, runs the .NET tests with TRX results uploaded even on
+failure, and runs the Python tests.
