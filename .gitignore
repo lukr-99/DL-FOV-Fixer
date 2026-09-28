@@ -15,3 +15,10 @@ dist/
 .idea/
 Thumbs.db
 desktop.ini
+
+# .NET
+bin/
+obj/
+TestResults/
+*.user
+.vs/
