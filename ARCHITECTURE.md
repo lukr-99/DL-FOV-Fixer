@@ -100,6 +100,12 @@ and `DlFovFixer.Infrastructure` and `DlFovFixer.App` on `net10.0-windows`, each 
 unless it is built with `-p:DlFovFixerReleaseBuild=true`. Architecture tests keep Core free of the
 other layers, WPF, the registry and the network, and keep Infrastructure free of the shell.
 
+`DlFovFixer.Core/GameInfo` holds the ported merge as pure text functions: `BlockMerge` for one
+block, `GameInfoMerge` for the value and the tweaks together, `VideoConfigMerge` for `video.txt`,
+`TweakTextParser` for pasted configs and `AspectRatio` for typed values. Reading and writing files is
+not there; it arrives with the adapters. The shared vectors in `contracts/vectors/` define the
+behavior, and the Python tests and the Core tests both run them.
+
 `.github/workflows/ci.yml` runs on every pull request and every push to `main`. It checks .NET
 formatting, builds with warnings as errors, runs the .NET tests with TRX results uploaded even on
 failure, and runs the Python tests.

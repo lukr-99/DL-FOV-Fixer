@@ -1,5 +1,8 @@
-"""Unit tests for the gameinfo.gi patcher. Run with:  python -m pytest -q
-(or plain `python tests/test_gameinfo.py`)."""
+"""Tests for patch(), which only the Python app has.
+
+The app itself applies through apply_config(), and that path, together with reading the value,
+normalize_value() and aspect_to_fov(), is covered by the shared vectors in test_vectors.py.
+Run with:  py -m pytest -q"""
 
 import os
 import sys
@@ -54,12 +57,6 @@ def _balanced(text):
     return text.count("{") == text.count("}")
 
 
-def test_reads_existing_value(tmp_path):
-    p = tmp_path / "gameinfo.gi"
-    _write(p, SAMPLE)
-    assert gameinfo.read_current(str(p)) == "2.3"
-
-
 def test_update_existing_value(tmp_path):
     p = tmp_path / "gameinfo.gi"
     _write(p, SAMPLE)
@@ -103,19 +100,6 @@ def test_create_convars_block(tmp_path):
     assert gameinfo.read_current(str(p)) == "2.49"
     out = open(p, encoding="utf-8").read()
     assert "ConVars" in out and _balanced(out)
-
-
-def test_normalize():
-    assert gameinfo.normalize_value("2") == "2"
-    assert gameinfo.normalize_value(" 2,15 ") == "2.15"
-    assert gameinfo.normalize_value("abc") is None
-    assert gameinfo.normalize_value("99") is None
-    assert gameinfo.normalize_value("") is None
-
-
-def test_fov_mapping():
-    assert gameinfo.aspect_to_fov("2.15") == 91  # ~90
-    assert gameinfo.aspect_to_fov("3.00") == 115
 
 
 if __name__ == "__main__":

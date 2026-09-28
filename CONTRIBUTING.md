@@ -30,8 +30,8 @@ Building the executable needs PyInstaller and produces `dist\DL-FOV-Fixer.exe`:
 
 `gameinfo.gi` is a file the game must still be able to parse, and the user's install is their only
 copy. A change to the merge keeps every rule in [AGENTS.md](AGENTS.md), and gets a case that proves
-it: today a test in `tests/`, and from the C# port on, a vector in `contracts/vectors/` that both
-test suites read.
+it: a vector in `contracts/vectors/` that both test suites read. See
+[contracts/vectors/README.md](contracts/vectors/README.md) for the format and how to add a case.
 
 Never reformat the file, never rewrite a key that already exists as a sub-block, and never overwrite
 an existing `.dlfovfixer.bak`.
