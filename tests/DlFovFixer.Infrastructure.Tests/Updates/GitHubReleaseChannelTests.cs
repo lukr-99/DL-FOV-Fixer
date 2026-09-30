@@ -18,27 +18,38 @@ public sealed class GitHubReleaseChannelTests : IDisposable
     public void Dispose() => _folder.Dispose();
 
     [Fact]
-    public async Task FetchManifest_ReadsTheLatestReleasesManifest()
+    public async Task FetchLatest_ReadsTheManifestAndItsSignature()
     {
-        _handler.Responses[$"{Repository}/releases/latest/download/manifest.json"] = Encoding.UTF8.GetBytes("{\"schema\":1}");
+        _handler.Responses[$"{Repository}/releases/latest/download/manifest.json"] = Encoding.UTF8.GetBytes("{\"schema\":1}\n");
+        _handler.Responses[$"{Repository}/releases/latest/download/manifest.sig"] = Encoding.ASCII.GetBytes("c2lnbmF0dXJl\r\n");
 
-        var bytes = await Channel().FetchManifestAsync(TestContext.Current.CancellationToken);
+        var snapshot = await Channel().FetchLatestAsync(TestContext.Current.CancellationToken);
 
-        Assert.Equal("{\"schema\":1}", Encoding.UTF8.GetString(bytes));
+        Assert.Equal("{\"schema\":1}\n", Encoding.UTF8.GetString(snapshot.ManifestBytes));
+        Assert.Equal("c2lnbmF0dXJl", snapshot.SignatureBase64);
     }
 
     [Fact]
-    public async Task FetchManifest_FarTooLarge_IsRefused()
+    public async Task FetchLatest_NoSignature_Throws()
+    {
+        _handler.Responses[$"{Repository}/releases/latest/download/manifest.json"] = Encoding.UTF8.GetBytes("{}");
+
+        await Assert.ThrowsAsync<HttpRequestException>(() => Channel().FetchLatestAsync(TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
+    public async Task FetchLatest_FarTooLarge_IsRefused()
     {
         _handler.Responses[$"{Repository}/releases/latest/download/manifest.json"] = new byte[GitHubReleaseChannel.MaxManifestSize + 1];
+        _handler.Responses[$"{Repository}/releases/latest/download/manifest.sig"] = [1];
 
-        await Assert.ThrowsAsync<InvalidDataException>(() => Channel().FetchManifestAsync(TestContext.Current.CancellationToken));
+        await Assert.ThrowsAsync<InvalidDataException>(() => Channel().FetchLatestAsync(TestContext.Current.CancellationToken));
     }
 
     [Fact]
-    public async Task FetchManifest_NotFound_Throws()
+    public async Task FetchLatest_NotFound_Throws()
     {
-        await Assert.ThrowsAsync<HttpRequestException>(() => Channel().FetchManifestAsync(TestContext.Current.CancellationToken));
+        await Assert.ThrowsAsync<HttpRequestException>(() => Channel().FetchLatestAsync(TestContext.Current.CancellationToken));
     }
 
     [Fact]

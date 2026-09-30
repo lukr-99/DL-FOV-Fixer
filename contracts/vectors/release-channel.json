@@ -2,6 +2,7 @@
   "about": "Where the update channel's files live, which artifact paths may be downloaded, and which manifests are accepted. Only the C# app reads this file.",
   "repository": "https://github.com/lukr-99/DL-FOV-Fixer/",
   "manifest": "https://github.com/lukr-99/DL-FOV-Fixer/releases/latest/download/manifest.json",
+  "signature": "https://github.com/lukr-99/DL-FOV-Fixer/releases/latest/download/manifest.sig",
   "releasesPage": "https://github.com/lukr-99/DL-FOV-Fixer/releases/latest",
   "artifacts": [
     { "path": "2.0.0/DL-FOV-Fixer-2.0.0-setup.exe", "expected": "https://github.com/lukr-99/DL-FOV-Fixer/releases/download/v2.0.0/DL-FOV-Fixer-2.0.0-setup.exe" },

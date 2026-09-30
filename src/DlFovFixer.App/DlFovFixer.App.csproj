@@ -12,23 +12,24 @@
   </PropertyGroup>
 
   <!--
-    The publisher an update installer must be signed by: the common name of the code-signing
-    certificate (ADR 0003). Set DLFOVFIXER_PUBLISHER or pass -p:DlFovFixerPublisher=... A build
-    without one cannot update itself and offers the releases page instead. A release build without
-    one is refused, because 2.x installers are always signed (ADR 0002).
+    The public key an update manifest must be signed with (ADR 0006), read from
+    contracts/keys/release-manifest-public.b64. tools/setup-update-signing.ps1 made it, and the
+    private key stays offline and in the release workflow's secret. A release build without it is
+    refused, because it could never trust an update.
   -->
   <PropertyGroup>
-    <DlFovFixerPublisher Condition="'$(DlFovFixerPublisher)' == ''">$(DLFOVFIXER_PUBLISHER)</DlFovFixerPublisher>
+    <_ManifestKeyFile>$(RepositoryRoot)contracts\keys\release-manifest-public.b64</_ManifestKeyFile>
+    <DlFovFixerManifestPublicKey Condition="'$(DlFovFixerManifestPublicKey)' == '' and Exists('$(_ManifestKeyFile)')">$([System.IO.File]::ReadAllText('$(_ManifestKeyFile)').Trim())</DlFovFixerManifestPublicKey>
   </PropertyGroup>
 
   <ItemGroup>
-    <AssemblyMetadata Include="DlFovFixer.Publisher" Value="$(DlFovFixerPublisher)" />
+    <AssemblyMetadata Include="DlFovFixer.ManifestPublicKey" Value="$(DlFovFixerManifestPublicKey)" />
   </ItemGroup>
 
-  <Target Name="RequirePublisherForRelease"
+  <Target Name="RequireManifestKeyForRelease"
           BeforeTargets="CoreCompile"
-          Condition="'$(DlFovFixerReleaseBuild)' == 'true' and '$(DlFovFixerPublisher)' == ''">
-    <Error Text="Release builds need the update publisher. Set DLFOVFIXER_PUBLISHER to the common name of the code-signing certificate." />
+          Condition="'$(DlFovFixerReleaseBuild)' == 'true' and '$(DlFovFixerManifestPublicKey)' == ''">
+    <Error Text="Release builds need the update manifest key in contracts/keys/release-manifest-public.b64. See tools/setup-update-signing.ps1." />
   </Target>
 
   <ItemGroup>

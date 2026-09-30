@@ -1,15 +1,16 @@
 namespace DlFovFixer.Core.Updates;
 
 /// <summary>
-/// Release channel, then version policy, then the installer artifact, then a download checked
-/// against the manifest and the pinned publisher, then the installer launch (ADR 0003). Each stage
-/// sits behind its own seam, and none of them touches the user's settings or game files.
+/// Release channel, then the manifest's signature, then the version policy, then the installer
+/// artifact, then a download checked against the manifest's size and SHA-256, then the installer
+/// launch (ADR 0006). Unsigned bytes are never parsed. Each stage sits behind its own seam, and none
+/// of them touches the user's settings or game files.
 /// </summary>
 public sealed class UpdateService(
     string installedVersion,
     bool channelConfigured,
     IReleaseChannel channel,
-    IPublisherCheck publisher,
+    ISignatureVerifier signatures,
     IUpdateInstaller installer)
 {
     public async Task<UpdateCheckResult> CheckAsync(CancellationToken cancellationToken)
@@ -24,17 +25,22 @@ public sealed class UpdateService(
             return new UpdateCheckResult.DevelopmentBuild();
         }
 
-        byte[] bytes;
+        ChannelSnapshot snapshot;
         try
         {
-            bytes = await channel.FetchManifestAsync(cancellationToken).ConfigureAwait(false);
+            snapshot = await channel.FetchLatestAsync(cancellationToken).ConfigureAwait(false);
         }
         catch (Exception error) when (error is not OperationCanceledException)
         {
             return new UpdateCheckResult.Failed(error.Message);
         }
 
-        var check = ReleaseManifestParser.Parse(bytes);
+        if (!signatures.Verify(snapshot.ManifestBytes, snapshot.SignatureBase64))
+        {
+            return new UpdateCheckResult.BadSignature();
+        }
+
+        var check = ReleaseManifestParser.Parse(snapshot.ManifestBytes);
         if (check is ManifestCheck.BadManifest bad)
         {
             return new UpdateCheckResult.BadManifest(bad.Reason);
@@ -59,15 +65,11 @@ public sealed class UpdateService(
             return new InstallResult.Failed(error.Message);
         }
 
+        // The signed manifest names the exact bytes, so a match here is what makes the file trusted.
         if (downloaded.Size != expected.Size
             || !string.Equals(downloaded.Sha256, expected.Sha256, StringComparison.OrdinalIgnoreCase))
         {
             return new InstallResult.DownloadCorrupted();
-        }
-
-        if (!publisher.IsTrusted(downloaded.LocalPath))
-        {
-            return new InstallResult.Untrusted();
         }
 
         try

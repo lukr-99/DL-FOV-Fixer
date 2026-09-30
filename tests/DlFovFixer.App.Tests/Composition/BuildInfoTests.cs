@@ -1,3 +1,4 @@
+using System.IO;
 using System.Reflection;
 using DlFovFixer.App.Composition;
 
@@ -18,10 +19,17 @@ public sealed class BuildInfoTests
     }
 
     [Fact]
-    public void Current_ReleaseBuild_AlwaysNamesItsPublisher()
+    public void Current_CarriesTheRepositorysManifestKey()
     {
-        var build = BuildInfo.Current;
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "version.properties")))
+        {
+            directory = directory.Parent;
+        }
 
-        Assert.True(!build.IsRelease || build.Publisher.Length > 0);
+        Assert.NotNull(directory);
+        var key = File.ReadAllText(Path.Combine(directory.FullName, "contracts", "keys", "release-manifest-public.b64")).Trim();
+
+        Assert.Equal(key, BuildInfo.Current.ManifestPublicKey);
     }
 }

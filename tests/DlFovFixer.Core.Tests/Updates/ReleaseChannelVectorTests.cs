@@ -28,9 +28,10 @@ public sealed class ReleaseChannelVectorTests
     public static TheoryData<string> ManifestCases() => VectorFile.CaseNames(File, "manifests");
 
     [Fact]
-    public void Addresses_OfTheManifestAndTheReleasesPage()
+    public void Addresses_OfTheManifestItsSignatureAndTheReleasesPage()
     {
         Assert.Equal(Vectors.GetProperty("manifest").GetString(), Address.Manifest);
+        Assert.Equal(Vectors.GetProperty("signature").GetString(), Address.Signature);
         Assert.Equal(Vectors.GetProperty("releasesPage").GetString(), Address.ReleasesPage);
     }
 

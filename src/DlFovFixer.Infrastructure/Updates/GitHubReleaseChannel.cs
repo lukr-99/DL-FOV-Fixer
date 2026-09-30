@@ -1,12 +1,13 @@
 using System.Net.Http;
 using System.Security.Cryptography;
+using System.Text;
 using DlFovFixer.Core.Updates;
 
 namespace DlFovFixer.Infrastructure.Updates;
 
 /// <summary>
 /// Reads the update channel from the public GitHub Releases, with no sign-in. This class only
-/// fetches bytes: the update service decides whether to trust them. GitHub answers a release
+/// fetches bytes: the update service checks the signature and decides whether to trust them. GitHub answers a release
 /// download with a redirect to its file host, which the default handler follows.
 /// </summary>
 public sealed class GitHubReleaseChannel(HttpClient http, ReleaseChannelAddress address, string downloadFolder) : IReleaseChannel
@@ -14,17 +15,27 @@ public sealed class GitHubReleaseChannel(HttpClient http, ReleaseChannelAddress 
     /// <summary>A manifest is a few hundred bytes. Anything far larger is not one.</summary>
     public const int MaxManifestSize = 65_536;
 
+    /// <summary>A base64 DER ECDSA P-256 signature is under 100 bytes.</summary>
+    public const int MaxSignatureSize = 1_024;
+
     private const int BufferSize = 81_920;
 
-    public async Task<byte[]> FetchManifestAsync(CancellationToken cancellationToken)
+    public async Task<ChannelSnapshot> FetchLatestAsync(CancellationToken cancellationToken)
     {
-        using var response = await http.GetAsync(address.Manifest, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
+        var manifest = await FetchSmallAsync(address.Manifest, MaxManifestSize, cancellationToken).ConfigureAwait(false);
+        var signature = await FetchSmallAsync(address.Signature, MaxSignatureSize, cancellationToken).ConfigureAwait(false);
+        return new ChannelSnapshot(manifest, Encoding.ASCII.GetString(signature).Trim());
+    }
+
+    private async Task<byte[]> FetchSmallAsync(string url, int limit, CancellationToken cancellationToken)
+    {
+        using var response = await http.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
         response.EnsureSuccessStatusCode();
         var source = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
         await using (source.ConfigureAwait(false))
         {
             using var copy = new MemoryStream();
-            await CopyAsync(source, copy, MaxManifestSize, hash: null, cancellationToken).ConfigureAwait(false);
+            await CopyAsync(source, copy, limit, hash: null, cancellationToken).ConfigureAwait(false);
             return copy.ToArray();
         }
     }
