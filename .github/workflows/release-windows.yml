@@ -55,6 +55,8 @@ jobs:
         env:
           WINDOWS_CERT_PFX_BASE64: ${{ secrets.WINDOWS_CERT_PFX_BASE64 }}
           WINDOWS_CERT_PASSWORD: ${{ secrets.WINDOWS_CERT_PASSWORD }}
+          # The certificate's common name. The app accepts update installers only from it.
+          DLFOVFIXER_PUBLISHER: ${{ vars.DLFOVFIXER_PUBLISHER }}
         run: ./installer/build-installer.ps1 -Release
 
       - name: Report signing status

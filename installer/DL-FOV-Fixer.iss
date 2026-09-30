@@ -26,8 +26,9 @@ AppName={#MyAppName}
 AppVersion={#AppVersion}
 AppVerName={#MyAppName} {#AppVersion}
 AppPublisher={#MyAppPublisher}
-; Version 1.0 may already have dl-fov-fixer.exe in this folder. The installed exe has a different
-; name, so both can sit side by side. That is intended.
+; Version 1.0 may already have dl-fov-fixer.exe in this folder. Windows file names ignore case, so
+; that is the same file as DL-FOV-Fixer.exe and the install replaces it. That is intended: a Run
+; value 1.0 left behind then starts 2.0, and CloseApplications closes a running 1.0 first.
 DefaultDirName={localappdata}\Programs\DL-FOV-Fixer
 DisableProgramGroupPage=yes
 DisableDirPage=auto

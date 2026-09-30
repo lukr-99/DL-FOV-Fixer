@@ -5,9 +5,11 @@
 .DESCRIPTION
     Steps: self-contained publish, sign the exe, compile the installer, sign the installer, write
     the .sha256 and manifest.json beside it. Signing only happens when WINDOWS_CERT_PFX_BASE64 is
-    set (see tools/sign-windows-artifacts.ps1). Without it the build still works and is unsigned.
+    set (see tools/sign-windows-artifacts.ps1). Without it a dev build still works and is unsigned.
 
-    Without -Release the app is a "-dev" build. With -Release it carries the plain version.
+    Without -Release the app is a "-dev" build. With -Release it carries the plain version, and the
+    build needs both the certificate and DLFOVFIXER_PUBLISHER, the certificate's common name, which
+    the app pins as the only publisher it accepts an update installer from.
 
     Output, under <OutputDirectory>: DL-FOV-Fixer-<version>-setup.exe, the same name plus .sha256,
     and manifest.json. The publish folder is <OutputDirectory>/publish. Both are ignored by Git.
@@ -65,6 +67,9 @@ function Resolve-Iscc {
 function Invoke-Signing {
     param([string] $File, [string] $Description)
     if (-not $env:WINDOWS_CERT_PFX_BASE64) {
+        # The app refuses an update installer that is not signed by its pinned publisher, so an
+        # unsigned release could never be installed through the updater (ADR 0002, ADR 0003).
+        if ($Release) { throw "A release build must be signed, but WINDOWS_CERT_PFX_BASE64 is not set." }
         Write-Warning "WINDOWS_CERT_PFX_BASE64 is not set, so $(Split-Path -Leaf $File) stays unsigned."
         return
     }
