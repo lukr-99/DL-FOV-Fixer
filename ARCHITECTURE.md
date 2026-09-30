@@ -126,7 +126,9 @@ keeps a lock or a failure until the next apply. The tray shows them as three col
 the ports `IUserPrompts`, `INotifier` and `IFileOpener`, so it is tested without WPF.
 `Shell/TrayMenu` rebuilds the menu from it on every change, `Shell/TrayIcon` wraps `H.NotifyIcon`, and
 `Shell/StatusIconFactory` draws the cone icon as a multi-size `.ico`. `Startup/SingleInstance` keeps
-one copy per user, and `Composition/AppGraph` is the only composition root. `--settings <path>` runs
+one copy per user, and `Composition/AppGraph` is the only composition root. `GameInfoWatcher` re-applies
+the fix three seconds after a game update stops writing gameinfo.gi, and the periodic check stays as
+the fallback for a change the watcher misses. `--settings <path>` runs
 the app on another `config.json`, which is how a smoke test stays away from the real game files.
 
 `Core/Updates/UpdateService` is the update seam from ADR 0003: `manifest.json` on the latest release,
