@@ -19,6 +19,25 @@ came from a tool or platform trap. Put new entries at the top, in this shape:
 A pitfall that could hit another repository is also reported to CodePrint. CodePrint's
 `docs/pitfalls/README.md` explains how.
 
+## Uninstall leaves the running app and its files behind
+
+- Symptom: after an uninstall with the app in the tray, the app keeps running, the uninstall entry
+  and shortcut are gone, and the log is full of:
+
+  ```text
+  Failed to delete the file; it may be in use (5).
+  ```
+
+- Cause: `CloseApplications` makes Setup close the app through the Restart Manager, but the
+  uninstaller does not. Then a first fix, an `[UninstallRun]` PowerShell step, failed with exit
+  code 1: Inno Setup turns `{{` into `{` in a parameter, but leaves `}}` as it is, so the script
+  block ended in `}}`.
+- Fix: `[UninstallRun]` stops only the copy running from `{app}` and waits for it, with `{{` for an
+  opening brace and a plain `}` for a closing one. The uninstall log shows the step's exit code.
+- Closed off by: not yet, only the hand test in the installer checklist. Check `Process exit code: 0`
+  and `Failed to delete` in an uninstall log (`unins000.exe /SILENT /LOG=<file>`).
+- Seen: 2026-09-30, the first hand test of the 2.x installer, before any release.
+
 ## A test that creates a WPF Application breaks WPF tests running beside it
 
 - Symptom: a WPF test fails now and then, about one run in four:

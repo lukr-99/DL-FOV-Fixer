@@ -68,6 +68,13 @@ Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#MyAppName}}
 ; After an in-place update the app starts the installer with /SILENT /UPDATE, so bring the app back.
 Filename: "{app}\{#MyAppExeName}"; Flags: nowait; Check: IsSilentUpdate
 
+[UninstallRun]
+; Setup closes the running app through the Restart Manager (CloseApplications), but uninstall
+; does not, so the app's exe and DLLs stayed behind, in use, with the app still in the tray.
+; Stop only the copy that runs from this install folder, so a dev build elsewhere is left alone,
+; and wait for it to exit before files are removed. Inno Setup turns {{ into {, but leaves } alone.
+Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; Parameters: "-NoProfile -NonInteractive -ExecutionPolicy Bypass -Command ""$p = @(Get-Process -Name 'DL-FOV-Fixer' -ErrorAction SilentlyContinue | Where-Object {{ $_.Path -eq '{app}\{#MyAppExeName}' }); $p | Stop-Process -Force; $p | Wait-Process -Timeout 10 -ErrorAction SilentlyContinue"""; Flags: runhidden waituntilterminated; RunOnceId: "StopRunningApp"
+
 ; User settings in %APPDATA%\DL-FOV-Fixer are never removed by the uninstaller, so a reinstall keeps
 ; the chosen FOV. The Run value is handled in the [Code] section because the installer does not
 ; create it.
