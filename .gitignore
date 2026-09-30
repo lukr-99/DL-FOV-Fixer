@@ -22,3 +22,6 @@ obj/
 TestResults/
 *.user
 .vs/
+
+# Installer build output
+artifacts/

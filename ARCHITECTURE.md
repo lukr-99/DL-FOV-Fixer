@@ -93,8 +93,8 @@ leaving them implied.
 
 ## The C# port in progress
 
-The .NET solution `DL-FOV-Fixer.slnx` sits beside the Python app. It runs as a tray app, but it ships
-nothing yet: updates and the installer are M6. It has the
+The .NET solution `DL-FOV-Fixer.slnx` sits beside the Python app. It runs as a tray app and can be
+built into a per-user installer, but no release ships it yet. It has the
 three projects from [docs/csharp-rewrite.md](docs/csharp-rewrite.md): `DlFovFixer.Core` on `net10.0`,
 and `DlFovFixer.Infrastructure` and `DlFovFixer.App` on `net10.0-windows`, each with a test project.
 `Directory.Build.props` reads the version from `version.properties` and marks every build `-dev`
@@ -128,6 +128,13 @@ the ports `IUserPrompts`, `INotifier` and `IFileOpener`, so it is tested without
 `Shell/StatusIconFactory` draws the cone icon as a multi-size `.ico`. `Startup/SingleInstance` keeps
 one copy per user, and `Composition/AppGraph` is the only composition root. `--settings <path>` runs
 the app on another `config.json`, which is how a smoke test stays away from the real game files.
+
+`Core/Updates/UpdateService` is the update seam from ADR 0003: `manifest.json` on the latest release,
+the version policy, the installer artifact, a download checked against the manifest's size and
+SHA-256 and against the publisher pinned at build time, then the installer launch.
+`Infrastructure/Updates` has the GitHub channel, the Authenticode check and the launcher, and
+`App/ViewModels/UpdatesViewModel` runs them from the menu. `installer/` holds the Inno Setup script
+and `build-installer.ps1`, and `release-windows.yml` builds a draft release from a `v2.*` tag.
 
 `.github/workflows/ci.yml` runs on every pull request and every push to `main`. It checks .NET
 formatting, builds with warnings as errors, runs the .NET tests with TRX results uploaded even on

@@ -1,17 +1,21 @@
 # Plan: rewrite DL-FOV-Fixer in C#
 
 Status: M2 (scaffold), M3 (the merge in Core, against shared vectors), M4 (the Windows adapters and
-the apply use case) and M5 (the tray shell) are in place. The C# app runs as a tray app with 1.0's
-menu, except for the update items, which arrive with the update seam in M6. The Python tray app in
+the apply use case) and M5 (the tray shell) are in place, and so is the code half of M6: the update
+seam, the Inno Setup installer in `installer/` and the `v2.*` release workflow, which publishes a
+draft release. What M6 still needs is the code-signing certificate, since a release build refuses to
+go out unsigned or without a pinned publisher, and the 1.0.2 bridge release. The Python tray app in
 `dlfovfixer/` is still what ships, and it stays on `main` until the C# app does everything it does.
 
-Where M5 differs from 1.0 on purpose:
+Where the C# app differs from 1.0 on purpose:
 
 - "View stored tweaks" shows the list in a read-only window instead of writing a temporary file.
 - Messages use a colon where 1.0 used a dash, as this repository's writing rules ask.
 - A second launch tells the running copy, which says it is already running. 1.0 started a second
   tray icon.
 - Menus and dialogs use the standard Windows look. Following the dark theme is not done yet.
+- A build that cannot update itself, a dev build or one without a pinned publisher, offers the
+  releases page from "Check for updates" instead.
 
 ## Why
 

@@ -10,7 +10,7 @@ namespace DlFovFixer.App.Shell;
 /// </summary>
 public static class TrayMenu
 {
-    public static ContextMenu Build(TrayViewModel model, Action quit)
+    public static ContextMenu Build(TrayViewModel model, UpdatesViewModel updates, Action quit)
     {
         var settings = model.Settings;
         var menu = new ContextMenu();
@@ -42,6 +42,11 @@ public static class TrayMenu
         menu.Items.Add(tweaks);
 
         menu.Items.Add(new Separator());
+        menu.Items.Add(Item(updates.CheckLabel, () => _ = updates.CheckAsync(interactive: true), isEnabled: !updates.IsChecking));
+        menu.Items.Add(Item(updates.InstallLabel, () => _ = updates.InstallAsync(), isEnabled: updates.CanInstall));
+        menu.Items.Add(Item("Check updates on start", model.ToggleCheckUpdatesOnStart, isChecked: settings.CheckUpdatesOnStart));
+
+        menu.Items.Add(new Separator());
         menu.Items.Add(Item("Open gameinfo.gi", model.OpenGameInfo));
         menu.Items.Add(Item("Locate gameinfo.gi…", model.LocateGameInfo));
         menu.Items.Add(new Separator());
@@ -55,11 +60,12 @@ public static class TrayMenu
 
     private static MenuItem Label(string text) => new() { Header = text, IsEnabled = false };
 
-    private static MenuItem Item(string header, Action action, bool? isChecked = null, bool bold = false)
+    private static MenuItem Item(string header, Action action, bool? isChecked = null, bool bold = false, bool isEnabled = true)
     {
         var item = new MenuItem
         {
             Header = header,
+            IsEnabled = isEnabled,
             IsChecked = isChecked == true,
             FontWeight = bold ? System.Windows.FontWeights.SemiBold : System.Windows.FontWeights.Normal,
         };

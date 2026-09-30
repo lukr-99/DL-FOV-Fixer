@@ -189,6 +189,8 @@ public sealed class TrayViewModel(
 
     public void ToggleApplyTweaks() => Save(Settings with { ApplyTweaks = !Settings.ApplyTweaks });
 
+    public void ToggleCheckUpdatesOnStart() => Save(Settings with { CheckUpdatesOnStart = !Settings.CheckUpdatesOnStart });
+
     public void ToggleAutoApply() => Save(Settings with { AutoApplyOnStart = !Settings.AutoApplyOnStart });
 
     public void ToggleSignInStartup()
@@ -237,7 +239,8 @@ public sealed class TrayViewModel(
             $"File: {(path.Length > 0 ? path : "(not located)")}\n" +
             $"Target: r_aspectratio {FovLabel(Settings.FovValue)}\n" +
             $"Extra tweaks: {Counts(Settings.Tweaks)} ({(Settings.ApplyTweaks ? "on" : "off")})\n" +
-            $"Backup: {(HasGameInfo() ? files.BackupPathOf(path) : "(n/a)")}");
+            $"Update checks on start: {(Settings.CheckUpdatesOnStart ? "on" : "off")}\n" +
+            $"Backup:{(HasGameInfo() ? files.BackupPathOf(path) : "(n/a)")}");
     }
 
     /// <summary>A value with its field of view when it is a number, like "2.49 (~101°)".</summary>

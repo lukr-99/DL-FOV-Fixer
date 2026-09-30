@@ -1,9 +1,11 @@
 name: Release
 
+# The Python 1.x build only. The C# 2.x installer ships from release-windows.yml on v2.* tags.
+
 on:
   push:
     tags:
-      - "v*"
+      - "v1.*"
 
 permissions:
   contents: write

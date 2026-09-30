@@ -11,6 +11,26 @@
     <ApplicationManifest>app.manifest</ApplicationManifest>
   </PropertyGroup>
 
+  <!--
+    The publisher an update installer must be signed by: the common name of the code-signing
+    certificate (ADR 0003). Set DLFOVFIXER_PUBLISHER or pass -p:DlFovFixerPublisher=... A build
+    without one cannot update itself and offers the releases page instead. A release build without
+    one is refused, because 2.x installers are always signed (ADR 0002).
+  -->
+  <PropertyGroup>
+    <DlFovFixerPublisher Condition="'$(DlFovFixerPublisher)' == ''">$(DLFOVFIXER_PUBLISHER)</DlFovFixerPublisher>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <AssemblyMetadata Include="DlFovFixer.Publisher" Value="$(DlFovFixerPublisher)" />
+  </ItemGroup>
+
+  <Target Name="RequirePublisherForRelease"
+          BeforeTargets="CoreCompile"
+          Condition="'$(DlFovFixerReleaseBuild)' == 'true' and '$(DlFovFixerPublisher)' == ''">
+    <Error Text="Release builds need the update publisher. Set DLFOVFIXER_PUBLISHER to the common name of the code-signing certificate." />
+  </Target>
+
   <ItemGroup>
     <InternalsVisibleTo Include="DlFovFixer.App.Tests" />
   </ItemGroup>

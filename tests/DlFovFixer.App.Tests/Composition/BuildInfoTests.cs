@@ -16,4 +16,12 @@ public sealed class BuildInfoTests
         Assert.Equal(informational, build.Version);
         Assert.Equal(!informational.EndsWith("-dev", StringComparison.Ordinal), build.IsRelease);
     }
+
+    [Fact]
+    public void Current_ReleaseBuild_AlwaysNamesItsPublisher()
+    {
+        var build = BuildInfo.Current;
+
+        Assert.True(!build.IsRelease || build.Publisher.Length > 0);
+    }
 }
