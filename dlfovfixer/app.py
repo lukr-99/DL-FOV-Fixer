@@ -116,18 +116,11 @@ def _ask_yesno(message: str) -> bool:
 
 def _ask_manual_update(release: updater.ReleaseInfo) -> bool:
     return _ask_yesno(
-        f"{release.name} is available.
-
-"
-        f"Current version: {updater.current_version()}
-"
-        f"New version: {release.tag}
-
-"
+        f"{release.name} is available.\n\n"
+        f"Current version: {updater.current_version()}\n"
+        f"New version: {release.tag}\n\n"
         "This version must be installed by hand. "
-        "It cannot be installed from inside the app.
-
-"
+        "It cannot be installed from inside the app.\n\n"
         "Open the download page now?"
     )
 
