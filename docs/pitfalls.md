@@ -19,6 +19,24 @@ came from a tool or platform trap. Put new entries at the top, in this shape:
 A pitfall that could hit another repository is also reported to CodePrint. CodePrint's
 `docs/pitfalls/README.md` explains how.
 
+## A test that creates a WPF Application breaks WPF tests running beside it
+
+- Symptom: a WPF test fails now and then, about one run in four:
+
+  ```text
+  System.InvalidOperationException : Cannot access Freezable 'System.Windows.Media.SolidColorBrush' across threads because it cannot be frozen.
+  ```
+
+  thrown while a `MenuItem` is created, in `TrayMenuTests`.
+- Cause: xUnit runs test classes in parallel, each on its own STA thread here. While one test holds
+  a WPF `Application` with WPF UI's resources, every element made on another thread takes its
+  implicit styles, and their brushes belong to the Application's thread.
+- Fix: put a test that creates an `Application` in the `WpfApplicationCollection`, which turns off
+  parallel runs, so xUnit runs it on its own after the other tests.
+- Closed off by: `WpfApplicationCollection` on `ThemeResourcesTests`. 15 full runs in a row passed
+  after the fix.
+- Seen: 2026-09-30, on `main` right after the dark theme (#10) merged. CI had passed.
+
 ## WPF UI's Window style makes every plain Window throw when it is shown
 
 - Symptom:
