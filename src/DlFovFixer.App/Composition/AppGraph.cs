@@ -15,8 +15,9 @@ using DlFovFixer.Infrastructure.Updates;
 namespace DlFovFixer.App.Composition;
 
 /// <summary>
-/// The only composition root. It builds the adapters, the use cases and the tray, and owns the
-/// timer that re-applies the fix after a game update.
+/// The only composition root. It builds the adapters, the use cases and the tray. A watcher on
+/// gameinfo.gi re-applies the fix as soon as a game update resets it, and the periodic timer is the
+/// fallback for a change the watcher misses.
 /// </summary>
 public sealed class AppGraph : IDisposable
 {
@@ -28,6 +29,10 @@ public sealed class AppGraph : IDisposable
     private readonly UpdatesViewModel _updates;
     private readonly HttpClient _http;
     private readonly DispatcherTimer _timer = new();
+    private readonly GameInfoWatcher _watcher = new(WatcherQuietPeriod);
+
+    // Long enough for a game update to finish writing the file.
+    private static readonly TimeSpan WatcherQuietPeriod = TimeSpan.FromSeconds(3);
 
     public AppGraph(BuildInfo build, StartupOptions options, Action quit)
     {
@@ -73,7 +78,13 @@ public sealed class AppGraph : IDisposable
             _tray.SetMenu(TrayMenu.Build(_model, _updates, quit));
         }
 
-        _model.Changed += (_, _) => Render();
+        var dispatcher = Dispatcher.CurrentDispatcher;
+        _model.Changed += (_, _) =>
+        {
+            Render();
+            _watcher.Watch(_model.Settings.GameInfoPath);
+        };
+        _watcher.Changed += (_, _) => dispatcher.BeginInvoke(_model.Tick);
         _updates.Changed += (_, _) => Render();
         _updates.ExitRequested += (_, _) => quit();
         _timer.Tick += (_, _) => _model.Tick();
@@ -102,6 +113,7 @@ public sealed class AppGraph : IDisposable
     public void Dispose()
     {
         _timer.Stop();
+        _watcher.Dispose();
         _tray.Dispose();
         _http.Dispose();
     }
