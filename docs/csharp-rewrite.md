@@ -255,6 +255,21 @@ M1 comes before the scaffold on purpose. It is a day of work that can retire the
 was planned around a certificate that is now not being bought (ADR 0006), so it measures the
 unsigned .NET installer instead.
 
+### M1 results so far
+
+Measured on 2026-09-30 on the owner's Windows 11 PC, Microsoft Defender platform 4.18.26080.4,
+signatures 1.459.480.0 from that day, real-time protection on:
+
+| File | Defender custom scan |
+|---|---|
+| `DL-FOV-Fixer-2.0.0-setup.exe` from the v2.0.0 release (unsigned) | No threats found |
+| The installed app folder, `%LOCALAPPDATA%\Programs\DL-FOV-Fixer` | No threats found |
+| The 1.x PyInstaller `DL-FOV-Fixer.exe` (for comparison) | Reported as a trojan, which is why the rewrite exists |
+
+Not measured yet: the SmartScreen prompt on a browser download (the test file came through
+`gh release download`, which adds no mark-of-the-web), and a VirusTotal scan, which means uploading
+the installer to a third-party service.
+
 ## Risks
 
 - **The verdict may not move.** A self-contained .NET app is not automatically clean, and an
