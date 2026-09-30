@@ -20,6 +20,7 @@ import sys
 import tempfile
 import threading
 import tkinter as tk
+import webbrowser
 from tkinter import filedialog, messagebox, simpledialog
 
 import pystray
@@ -111,6 +112,22 @@ def _ask_yesno(message: str) -> bool:
     return bool(_ui_call(
         lambda: messagebox.askyesno(APP_TITLE, message, parent=_dialog_parent())
     ))
+
+
+def _ask_manual_update(release: updater.ReleaseInfo) -> bool:
+    return _ask_yesno(
+        f"{release.name} is available.\n\n"
+        f"Current version: {updater.current_version()}\n"
+        f"New version: {release.tag}\n\n"
+        "This version must be installed by hand. "
+        "It cannot be installed from inside the app.\n\n"
+        "Open the download page now?"
+    )
+
+
+def _open_release_page(release: updater.ReleaseInfo):
+    if release.html_url:
+        webbrowser.open(release.html_url)
 
 
 def _ask_update(release: updater.ReleaseInfo) -> bool:
@@ -350,6 +367,14 @@ def check_updates(interactive: bool = True):
                 if interactive:
                     _notify(f"No update found. Current version is {updater.current_version()}.")
                 return
+            if release.asset is None:
+                _notify(
+                    f"Update available: {release.name}. "
+                    "It must be installed by hand from the release page."
+                )
+                if interactive and _ask_manual_update(release):
+                    _open_release_page(release)
+                return
             _notify(f"Update available: {release.name}.")
             if interactive and _ask_update(release):
                 install_update(release)
@@ -369,6 +394,9 @@ def install_update(release: "updater.ReleaseInfo | None" = None):
     release = release or _latest_update
     if release is None:
         _notify("No update is available yet. Use 'Check for updates' first.")
+        return
+    if release.asset is None:
+        _notify("This update must be installed by hand. Use 'Check for updates' to open the page.")
         return
 
     def worker():
@@ -624,9 +652,9 @@ def _build_menu() -> pystray.Menu:
         ),
         pystray.MenuItem(
             lambda item: f"Install update {_latest_update.tag}"
-            if _latest_update else "Install update",
+            if _latest_update and _latest_update.asset else "Install update",
             _on_install_update,
-            enabled=lambda item: _latest_update is not None,
+            enabled=lambda item: _latest_update is not None and _latest_update.asset is not None,
         ),
         pystray.MenuItem(
             "Check updates on start", _on_toggle_update_check,

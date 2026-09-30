@@ -19,6 +19,23 @@ came from a tool or platform trap. Put new entries at the top, in this shape:
 A pitfall that could hit another repository is also reported to CodePrint. CodePrint's
 `docs/pitfalls/README.md` explains how.
 
+## A line break typed as \n through a tool lands inside a Python string
+
+- Symptom:
+
+  ```text
+  SyntaxError: unterminated string literal (detected at line 119)
+  ```
+
+  when the app starts, while `py -m pytest -q` passes.
+- Cause: an edit made through a shell heredoc or a script turned each `\n` escape in a new
+  f-string into a real line break. No test imports `dlfovfixer/app.py`, because it needs pystray and
+  a display, so nothing compiled the broken file.
+- Fix: write the escapes again, and check a changed Python file with `py -m py_compile` before
+  committing it.
+- Closed off by: `tests/test_compile.py`, which compiles every module in `dlfovfixer/`.
+- Seen: 2026-09-30, the 1.0.2 updater bridge, in review before it was merged.
+
 ## Replacing a file the game holds open says "access denied", not "in use"
 
 - Symptom:
