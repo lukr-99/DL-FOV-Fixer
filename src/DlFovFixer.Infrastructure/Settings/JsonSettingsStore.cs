@@ -25,6 +25,8 @@ public sealed class JsonSettingsStore(string path) : ISettingsStore
     public static string DefaultPath =>
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "DL-FOV-Fixer", "config.json");
 
+    public bool Exists => File.Exists(path);
+
     public AppSettings Load()
     {
         JsonObject? root;

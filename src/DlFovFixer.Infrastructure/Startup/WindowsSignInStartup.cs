@@ -12,15 +12,26 @@ public sealed class WindowsSignInStartup(IRunValues runValues, string executable
 
     public bool IsEnabled => runValues.Read(ValueName) is not null;
 
+    private string Command => $"\"{executablePath}\"";
+
     public void SetEnabled(bool enabled)
     {
         if (enabled)
         {
-            runValues.Write(ValueName, $"\"{executablePath}\"");
+            runValues.Write(ValueName, Command);
         }
         else
         {
             runValues.Delete(ValueName);
+        }
+    }
+
+    public void Repair()
+    {
+        var current = runValues.Read(ValueName);
+        if (current is not null && current != Command)
+        {
+            runValues.Write(ValueName, Command);
         }
     }
 }

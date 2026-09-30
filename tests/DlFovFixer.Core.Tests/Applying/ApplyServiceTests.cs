@@ -102,31 +102,4 @@ public sealed class ApplyServiceTests
             FovValue = "2.49",
             Tweaks = ExtraTweaks.None with { Video = video ?? [] },
         };
-
-    /// <summary>Files in memory. <see cref="Failure"/>, when set, is thrown by every write.</summary>
-    private sealed class FakeGameFiles : IGameFiles
-    {
-        public Dictionary<string, string> Texts { get; } = new(StringComparer.OrdinalIgnoreCase);
-
-        public List<string> Writes { get; } = [];
-
-        public GameFileException? Failure { get; set; }
-
-        public string? ReadText(string path) => Texts.GetValueOrDefault(path);
-
-        public void WriteText(string path, string text)
-        {
-            if (Failure is not null)
-            {
-                throw Failure;
-            }
-
-            Writes.Add(path);
-            Texts[path] = text;
-        }
-
-        public string BackupPathOf(string path) => path + ".bak";
-
-        public bool RestoreBackup(string path) => false;
-    }
 }
