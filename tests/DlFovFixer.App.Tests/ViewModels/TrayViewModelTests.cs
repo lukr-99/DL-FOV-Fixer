@@ -316,6 +316,20 @@ public sealed class TrayViewModelTests
         Assert.False(_store.Saved!.AutoApplyOnStart);
     }
 
+    [Fact]
+    public void SetTheme_SavesItAndSaysSoOnlyWhenItChanges()
+    {
+        var model = Create();
+        var fired = 0;
+        model.Changed += (_, _) => fired++;
+
+        model.SetTheme(ThemeMode.Dark);
+        model.SetTheme(ThemeMode.Dark);
+
+        Assert.Equal(ThemeMode.Dark, _store.Saved!.Theme);
+        Assert.Equal(1, fired);
+    }
+
     [Theory]
     [InlineData(FixState.Ok, "DL FOV Fixer: up to date")]
     [InlineData(FixState.Waiting, "DL FOV Fixer: waiting for Deadlock to close")]

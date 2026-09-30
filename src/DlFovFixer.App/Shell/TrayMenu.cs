@@ -1,6 +1,7 @@
 using System.Windows.Controls;
 using DlFovFixer.App.ViewModels;
 using DlFovFixer.Core.GameInfo;
+using DlFovFixer.Core.Settings;
 
 namespace DlFovFixer.App.Shell;
 
@@ -52,24 +53,41 @@ public static class TrayMenu
         menu.Items.Add(new Separator());
         menu.Items.Add(Item("Apply automatically on start", model.ToggleAutoApply, isChecked: settings.AutoApplyOnStart));
         menu.Items.Add(Item("Start with Windows", model.ToggleSignInStartup, isChecked: model.IsSignInStartupEnabled));
+
+        var theme = new MenuItem { Header = "Theme" };
+        foreach (var (mode, label) in new[] { (ThemeMode.System, "Same as Windows"), (ThemeMode.Light, "Light"), (ThemeMode.Dark, "Dark") })
+        {
+            theme.Items.Add(Item(label, () => model.SetTheme(mode), isChecked: settings.Theme == mode));
+        }
+
+        menu.Items.Add(theme);
         menu.Items.Add(new Separator());
         menu.Items.Add(Item("About", model.ShowAbout));
         menu.Items.Add(Item("Quit", quit));
         return menu;
     }
 
-    private static MenuItem Label(string text) => new() { Header = text, IsEnabled = false };
+    private static MenuItem Label(string text) => new() { Header = Text(text), IsEnabled = false };
 
+    // A toggle is checkable, because the WPF UI style draws the check mark only then. The click
+    // flips IsChecked on its own, but the menu is built again from the settings right after.
     private static MenuItem Item(string header, Action action, bool? isChecked = null, bool bold = false, bool isEnabled = true)
     {
         var item = new MenuItem
         {
-            Header = header,
+            Header = Text(header),
             IsEnabled = isEnabled,
+            IsCheckable = isChecked is not null,
             IsChecked = isChecked == true,
             FontWeight = bold ? System.Windows.FontWeights.SemiBold : System.Windows.FontWeights.Normal,
         };
         item.Click += (_, _) => action();
         return item;
     }
+
+    /// <summary>
+    /// A header shown as it is written. A plain string header treats "_" as an access key marker,
+    /// which turned "r_aspectratio" into "raspectratio".
+    /// </summary>
+    internal static string Text(string header) => header.Replace("_", "__", StringComparison.Ordinal);
 }

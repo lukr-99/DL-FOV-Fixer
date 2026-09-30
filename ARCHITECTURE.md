@@ -138,6 +138,12 @@ SHA-256 and against the publisher pinned at build time, then the installer launc
 `App/ViewModels/UpdatesViewModel` runs them from the menu. `installer/` holds the Inno Setup script
 and `build-installer.ps1`, and `release-windows.yml` builds a draft release from a `v2.*` tag.
 
+`App/Theming` follows CodePrint's theme contract. `ThemeApplier` switches WPF UI's light, dark or
+high-contrast theme, which styles the tray menu and the standard controls, and sets the app's own
+semantic brushes (`ThemeTokens`, from `ThemePalette`). The mode (System, Light or Dark) is a setting
+in `config.json`. In System mode it follows Windows and changes with it without a restart.
+`dotnetlib` has no theme tokens or menu styles to reuse yet: its theming lives in its preview app.
+
 `.github/workflows/ci.yml` runs on every pull request and every push to `main`. It checks .NET
 formatting, builds with warnings as errors, runs the .NET tests with TRX results uploaded even on
 failure, and runs the Python tests.
