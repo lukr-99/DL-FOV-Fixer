@@ -14,9 +14,13 @@ public sealed record AppSettings(
     bool StartWithWindows,
     bool CheckUpdatesOnStart,
     ExtraTweaks Tweaks,
-    bool ApplyTweaks)
+    bool ApplyTweaks,
+    ThemeMode Theme = ThemeMode.System)
 {
-    /// <summary>The 1.0 defaults, used for any setting that is missing or unreadable.</summary>
+    /// <summary>
+    /// The defaults, used for any setting that is missing or unreadable. All but <see cref="Theme"/>
+    /// are 1.0's.
+    /// </summary>
     public static AppSettings Defaults { get; } = new(
         GameInfoPath: string.Empty,
         FovValue: AspectRatio.DefaultValue,
