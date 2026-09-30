@@ -1,12 +1,16 @@
+using System.IO;
+using System.Net.Http;
 using System.Windows.Threading;
 using DlFovFixer.App.Shell;
 using DlFovFixer.App.Startup;
 using DlFovFixer.App.ViewModels;
 using DlFovFixer.Core.Applying;
+using DlFovFixer.Core.Updates;
 using DlFovFixer.Infrastructure.GameFiles;
 using DlFovFixer.Infrastructure.Locating;
 using DlFovFixer.Infrastructure.Settings;
 using DlFovFixer.Infrastructure.Startup;
+using DlFovFixer.Infrastructure.Updates;
 
 namespace DlFovFixer.App.Composition;
 
@@ -16,8 +20,13 @@ namespace DlFovFixer.App.Composition;
 /// </summary>
 public sealed class AppGraph : IDisposable
 {
+    /// <summary>The repository whose releases are the update channel.</summary>
+    public const string RepositoryUrl = "https://github.com/lukr-99/DL-FOV-Fixer";
+
     private readonly TrayIcon _tray;
     private readonly TrayViewModel _model;
+    private readonly UpdatesViewModel _updates;
+    private readonly HttpClient _http;
     private readonly DispatcherTimer _timer = new();
 
     public AppGraph(BuildInfo build, StartupOptions options, Action quit)
@@ -31,6 +40,8 @@ public sealed class AppGraph : IDisposable
             signInStartup.Repair();
         }
 
+        var prompts = new WpfUserPrompts(TrayViewModel.AppTitle);
+        var opener = new ShellFileOpener();
         TrayViewModel? model = null;
         _tray = new TrayIcon(title, () => model?.ApplyNow());
         _model = model = new TrayViewModel(
@@ -40,15 +51,31 @@ public sealed class AppGraph : IDisposable
             new SteamGameInfoLocator(new WindowsRegistryReader(), SteamGameInfoLocator.CommonSteamFolders),
             signInStartup,
             files,
-            new WpfUserPrompts(TrayViewModel.AppTitle),
+            prompts,
             _tray,
-            new ShellFileOpener());
+            opener);
 
-        _model.Changed += (_, _) =>
+        _http = new HttpClient { Timeout = TimeSpan.FromMinutes(10) };
+        _http.DefaultRequestHeaders.UserAgent.ParseAdd($"DL-FOV-Fixer/{build.Version}");
+        var address = new ReleaseChannelAddress(RepositoryUrl);
+        var downloads = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "DL-FOV-Fixer", "Updates");
+        var service = new UpdateService(
+            build.Version,
+            channelConfigured: build.Publisher.Length > 0,
+            new GitHubReleaseChannel(_http, address, downloads),
+            new AuthenticodePublisherCheck(build.Publisher),
+            new InstallerLauncher());
+        _updates = new UpdatesViewModel(service, build.Version, address.ReleasesPage, prompts, _tray, opener);
+
+        void Render()
         {
             _tray.SetStatus(StatusColors.Of(_model.Status.State), $"{title}: {TrayViewModel.Describe(_model.Status.State)}");
-            _tray.SetMenu(TrayMenu.Build(_model, quit));
-        };
+            _tray.SetMenu(TrayMenu.Build(_model, _updates, quit));
+        }
+
+        _model.Changed += (_, _) => Render();
+        _updates.Changed += (_, _) => Render();
+        _updates.ExitRequested += (_, _) => quit();
         _timer.Tick += (_, _) => _model.Tick();
     }
 
@@ -65,11 +92,17 @@ public sealed class AppGraph : IDisposable
             _timer.Interval = TimeSpan.FromMinutes(minutes);
             _timer.Start();
         }
+
+        if (_model.Settings.CheckUpdatesOnStart)
+        {
+            _ = _updates.CheckAsync(interactive: false);
+        }
     }
 
     public void Dispose()
     {
         _timer.Stop();
         _tray.Dispose();
+        _http.Dispose();
     }
 }

@@ -2,16 +2,19 @@ using System.Reflection;
 
 namespace DlFovFixer.App.Composition;
 
-/// <summary>What Directory.Build.props stamped on this build: its version and whether it is a release.</summary>
-public sealed record BuildInfo(string Version, bool IsRelease)
+/// <summary>
+/// What the build stamped on this app: its version, whether it is a release, and the publisher an
+/// update installer must be signed by. An empty publisher means the app cannot update itself.
+/// </summary>
+public sealed record BuildInfo(string Version, bool IsRelease, string Publisher)
 {
     public static BuildInfo Current { get; } = Read(typeof(BuildInfo).Assembly);
 
     internal static BuildInfo Read(Assembly assembly)
     {
         var version = assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? "0.0.0-dev";
-        var isRelease = assembly.GetCustomAttributes<AssemblyMetadataAttribute>()
-            .Any(attribute => attribute.Key == "DlFovFixer.ReleaseBuild" && attribute.Value == "true");
-        return new BuildInfo(version, isRelease);
+        var metadata = assembly.GetCustomAttributes<AssemblyMetadataAttribute>().ToList();
+        string? Value(string key) => metadata.FirstOrDefault(attribute => attribute.Key == key)?.Value;
+        return new BuildInfo(version, Value("DlFovFixer.ReleaseBuild") == "true", Value("DlFovFixer.Publisher") ?? string.Empty);
     }
 }
