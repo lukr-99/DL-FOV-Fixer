@@ -1,11 +1,9 @@
 # Plan: rewrite DL-FOV-Fixer in C#
 
-Status: M2 (scaffold), M3 (the merge in Core, against shared vectors), M4 (the Windows adapters and
-the apply use case) and M5 (the tray shell) are in place, and so is the code half of M6: the update
-seam, the Inno Setup installer in `installer/` and the `v2.*` release workflow, which publishes a
-draft release. Updates are trusted through a signed manifest instead of a code-signing certificate
-(ADR 0006), so M6 needs nothing bought. The 1.0.2 bridge shipped on 2026-09-30. The Python tray app
-in `dlfovfixer/` is still what ships, and it stays on `main` until the C# app does everything it does.
+Status: **done.** 2.0.0 shipped on 2026-09-30 and the Python app was removed in M7. This file is
+kept as the record of the plan; [ARCHITECTURE.md](../ARCHITECTURE.md) describes the app as it is.
+Updates are trusted through a signed manifest instead of a code-signing certificate (ADR 0006). M1,
+measuring what Defender and SmartScreen do with the new installer, is still open.
 
 Where the C# app differs from 1.0 on purpose:
 

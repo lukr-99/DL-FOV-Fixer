@@ -30,12 +30,17 @@ waited out, not forced.
   single tokens, and a key that would collide with a sub-block is skipped rather than written.
 - **`config.json`.** Unknown keys are ignored and a corrupt file falls back to defaults, so a bad file
   cannot stop the app from starting.
-- **A downloaded release asset.** From 2.0.0 it must match the size and SHA-256 the release manifest
-  states, and carry a valid Authenticode signature from the pinned publisher, before it is allowed to
-  run ([ADR 0003](docs/adr/0003-updates-through-a-release-manifest-and-a-publisher-check.md)). The
-  1.x updater checks neither, which is one reason the update path is being replaced.
+- **A downloaded release.** The app reads `manifest.json` only after `manifest.sig` verifies against
+  the public key built into it, and runs an installer only when its size and SHA-256 match that
+  signed manifest ([ADR 0006](docs/adr/0006-trust-updates-through-a-signed-manifest-not-a-certificate.md)).
+  Download paths are limited to this repository's release assets, and every read has a size limit.
 
 ## Signing material
+
+The update key's private half lives only on the owner's offline drive and in the
+`DLFOVFIXER_MANIFEST_SIGNING_KEY` Actions secret. Only the public key is in the repository
+([contracts/keys/README.md](contracts/keys/README.md)). A leaked key is rotated: a new key, and one
+manual update for every user.
 
 Certificates, passwords and `.pfx` files never enter the repository. `tools/setup-windows-signing.ps1`
 enrols a certificate into the current user's store or a CI secret, and
@@ -44,8 +49,9 @@ caller ever holds it.
 
 ## Recovery
 
-- **A bad apply.** Copy `gameinfo.gi.dlfovfixer.bak` back over `gameinfo.gi`. Verifying the game files
-  in Steam also restores it.
+- **A bad apply.** Verify the game files in Steam, which restores a clean `gameinfo.gi`. Copy
+  `gameinfo.gi.dlfovfixer.bak` back only if the game has not been updated since that backup was
+  made, because it holds that day's version of the file.
 - **A bad release.** Delete that GitHub Release so no installed copy is offered it, then publish a
   fixed version.
 - **A leaked signing certificate.** Revoke it with the issuer, enrol a new one, and publish the next

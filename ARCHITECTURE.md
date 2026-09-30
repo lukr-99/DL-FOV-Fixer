@@ -1,8 +1,8 @@
 # DL-FOV-Fixer architecture
 
-This describes the app as it is today: a Python tray app packaged with PyInstaller. The planned C#
-rewrite is in [docs/csharp-rewrite.md](docs/csharp-rewrite.md) and the decisions behind it are in
-[docs/adr/](docs/adr/). Nothing in this file describes the rewrite as if it existed.
+This describes the app as it ships today: a C# tray app on .NET 10 with WPF, delivered as a per-user
+installer. The Python 1.x app it replaced was retired with 2.0.0. The plan of the rewrite is in
+[docs/csharp-rewrite.md](docs/csharp-rewrite.md), and the decisions are in [docs/adr/](docs/adr/).
 
 ## Context
 
@@ -15,136 +15,106 @@ Two things hold state:
 - `gameinfo.gi` (and optionally `cfg/video.txt`) in the Steam library. The game reads these, and they
   are the only place a change has any effect.
 - `%APPDATA%\DL-FOV-Fixer\config.json`. This is the user's remembered intent: the target value, the
-  stored tweaks, and the app's own settings.
+  stored tweaks, and the app's own settings. It keeps 1.x's format (ADR 0004).
 
 There is no server, no account and no network traffic except the update check.
 
-## Modules today
+## Projects
 
 ```text
-run.pyw / __main__.py
-        |
-        v
-    app.py ------> gameinfo.py  (read, merge, write, backup)
-      |     \----> tweaks.py    (parse a pasted config)
-      |      \---> config.py    (settings in %APPDATA%)
-      |       \--> locator.py   (find gameinfo.gi from Steam)
-      |        \-> startup.py   (HKCU Run value)
-      |         \> updater.py   (GitHub release check and self-replace)
-      \---------> iconfactory.py (draw the status icon)
+DlFovFixer.App             net10.0-windows  WPF tray shell, view models, the only composition root
+   |          \
+   v           v
+DlFovFixer.Infrastructure  net10.0-windows  files, registry, Steam, HTTP, manifest signatures
+   |
+   v
+DlFovFixer.Core            net10.0          domain and use cases, no UI, files, registry or network
 ```
 
-| Module | Responsibility |
-|---|---|
-| `app.py` | Tray icon, menu, dialogs, status colors, periodic re-apply, and the orchestration of everything below |
-| `gameinfo.py` | KeyValues brace matching, in-place key updates, block creation, the one-time backup, and all reads and writes |
-| `tweaks.py` | Turn a pasted config blob into ordered ConVars, SceneSystem and video entries, routed by key shape |
-| `config.py` | Load and atomically save `config.json`, filling in defaults |
-| `locator.py` | Find Steam from the registry, walk `libraryfolders.vdf`, look for Deadlock's `gameinfo.gi` |
-| `startup.py` | The per-user `Run` value that starts the app at sign-in |
-| `updater.py` | Read the latest GitHub Release, compare versions, download an asset, replace the running exe |
-| `iconfactory.py` | Draw the green, amber and red vision-cone tray icon |
+Dependencies point inward. Architecture tests keep Core free of the other layers, WPF, the registry
+and the network, and keep Infrastructure free of the shell. `Directory.Build.props` reads the version
+from `version.properties` and marks every build `-dev` unless it is built with
+`-p:DlFovFixerReleaseBuild=true`.
 
-`pystray` owns the tray icon and `tkinter` provides the dialogs. A hidden Tk root also drives the
-periodic timer, so the UI toolkit and the scheduler are the same object.
+## Core
 
-## Data flow
+- `GameInfo`: the merge as pure text functions (ADR 0005). `KeyValuesText` finds blocks with quotes
+  and `//` comments honored, `BlockMerge` merges keys into one block and touches only the block's
+  own keys, never a sub-block, `GameInfoMerge` applies the FOV and the tweaks together,
+  `VideoConfigMerge` handles `cfg/video.txt`, `TweakTextParser` sorts a pasted config by key shape,
+  and `AspectRatio` checks typed values. The vectors in `contracts/vectors/` define all of it.
+- `Applying`: `ApplyService` reads through `IGameFiles`, merges, and writes only a file whose text
+  changed. `StatusProbe` reads the file to find one of six `FixState` values, and after an apply it
+  keeps a lock or a failure until the next apply. A file the game holds open is `Waiting`, not
+  `Failed`.
+- `Settings`, `Locating`, `Startup`: the ports `ISettingsStore`, `IGameInfoLocator` and
+  `ISignInStartup`, and the settings record with its theme mode.
+- `Updates`: `UpdateService` fetches `manifest.json` and `manifest.sig` from the latest release,
+  checks the signature against the key built in from `contracts/keys/` before reading anything
+  (ADR 0006), applies the version policy, downloads the installer and accepts it only when its size
+  and SHA-256 match the signed manifest, then launches it.
 
-1. Start: `config.load()`, then locate `gameinfo.gi` if the stored path is empty or gone.
-2. Apply: `apply_config` merges the FOV plus, if enabled, the stored tweaks into `ConVars` and
-   `SceneSystem`, writing at most once and only if something changed. `setting.*` keys go to
-   `cfg/video.txt` instead. The first write to each file copies it to `<name>.dlfovfixer.bak`.
-3. Watch: a timer re-applies every `periodic_check_minutes`. A sharing violation (Win32 error 32 or
-   33) means the game has the file open, which is expected and retried rather than reported.
-4. Status: the icon is green when the file holds the target value, amber when it is found but the
-   value is absent or different, and red when the file cannot be found or read.
-
-## Delivery
-
-`build.bat` runs PyInstaller in one-file, no-console mode and produces `dist\DL-FOV-Fixer.exe`. It
-does not pass `--noupx`, so the executable is UPX compressed on any machine that has `upx` on PATH,
-and is not on one that does not. The committed `DL-FOV-Fixer.spec` records an earlier build with
-`upx=True`, but `build.bat` passes flags instead of using it. `.github/workflows/release.yml` builds that on a `v*` tag, runs the tests,
-signs the executable when a certificate is configured, and attaches it to a GitHub Release. The
-in-app updater downloads a newer release's `.exe`, then a temporary `.cmd` script waits for the
-process to exit, copies the new file over the old one and starts it again.
-
-## Known constraints
-
-- **Defender reports the released exe as a trojan.** A PyInstaller one-file build looks like a
-  self-extracting dropper, because its bootloader is the same one most droppers use. Signing is
-  tracked on the board, and the rewrite removes the shape entirely.
-- **The game holds the file open while it runs.** Writes fail with a sharing violation, which is a
-  normal transient state rather than an error.
-- **Windows only**, by construction: `winreg` for Steam discovery and for the `Run` value.
-- **Version lives in two files**, `dlfovfixer/__init__.py` and `pyproject.toml`, and they have to be
-  bumped together because the updater compares against `__version__`.
-
-Where this repository does not yet meet the CodePrint baseline:
-
-- `app.py` is both the host and the coordinator. It holds module-level state and imports every other
-  module directly, so there are no injected seams and the automated tests only cover the pure parts
-  (`gameinfo`, `tweaks`, and the updater's version comparison).
-- There is no theme support. `pystray` menus and `tkinter` dialogs follow neither a light nor a dark
-  token set.
-
-These are the gaps the rewrite is meant to close, and the plan lists them as slices rather than
-leaving them implied.
-
-## The C# port in progress
-
-The .NET solution `DL-FOV-Fixer.slnx` sits beside the Python app. It runs as a tray app and can be
-built into a per-user installer, but no release ships it yet. It has the
-three projects from [docs/csharp-rewrite.md](docs/csharp-rewrite.md): `DlFovFixer.Core` on `net10.0`,
-and `DlFovFixer.Infrastructure` and `DlFovFixer.App` on `net10.0-windows`, each with a test project.
-`Directory.Build.props` reads the version from `version.properties` and marks every build `-dev`
-unless it is built with `-p:DlFovFixerReleaseBuild=true`. Architecture tests keep Core free of the
-other layers, WPF, the registry and the network, and keep Infrastructure free of the shell.
-
-`DlFovFixer.Core/GameInfo` holds the ported merge as pure text functions: `BlockMerge` for one
-block, `GameInfoMerge` for the value and the tweaks together, `VideoConfigMerge` for `video.txt`,
-`TweakTextParser` for pasted configs and `AspectRatio` for typed values. The shared vectors in
-`contracts/vectors/` define the behavior, and the Python tests and the Core tests both run them.
-
-`Core/Applying/ApplyService` is the apply use case. It reads through `IGameFiles`, merges, and writes
-only a file whose text changed. A file the game holds open ends as `Waiting`, not `Failed`. Core
-also owns the ports `ISettingsStore`, `IGameInfoLocator` and `ISignInStartup`. `DlFovFixer.Infrastructure`
-implements all four:
+## Infrastructure
 
 - `FileSystemGameFiles`: UTF-8 without adding a byte-order mark, the one-time backup before the
   first change, and a write through a temporary file and `File.Replace`.
-- `JsonSettingsStore`: the 1.0 `config.json`, read as forgivingly as 1.0 read it, plus
-  `schemaVersion` on save. A checked-in file written by 1.0.0 is its test fixture.
+- `GameInfoWatcher`: a `FileSystemWatcher` on the stored `gameinfo.gi` that fires once the file has
+  been quiet for three seconds.
+- `JsonSettingsStore`: the 1.x `config.json`, read as forgivingly as 1.x read it, plus
+  `schemaVersion` and `theme` on save. A file written by 1.0.0 is its test fixture.
 - `SteamGameInfoLocator`: the registry, the common Steam folders and `libraryfolders.vdf`, behind
   `IRegistryReader` so tests never touch the real registry.
 - `WindowsSignInStartup`: the `DL-FOV-Fixer` Run value, behind `IRunValues`.
+- `Updates`: `GitHubReleaseChannel` (size limits on every read), `EcdsaSignatureVerifier` and
+  `InstallerLauncher`.
 
-`Core/Applying/StatusProbe` reads the file to find one of six `FixState` values, and after an apply it
-keeps a lock or a failure until the next apply. The tray shows them as three colors.
+## App
 
-`DlFovFixer.App` is the WPF shell. `ViewModels/TrayViewModel` holds everything the menu does, behind
-the ports `IUserPrompts`, `INotifier` and `IFileOpener`, so it is tested without WPF.
-`Shell/TrayMenu` rebuilds the menu from it on every change, `Shell/TrayIcon` wraps `H.NotifyIcon`, and
-`Shell/StatusIconFactory` draws the cone icon as a multi-size `.ico`. `Startup/SingleInstance` keeps
-one copy per user, and `Composition/AppGraph` is the only composition root. `GameInfoWatcher` re-applies
-the fix three seconds after a game update stops writing gameinfo.gi, and the periodic check stays as
-the fallback for a change the watcher misses. `--settings <path>` runs
-the app on another `config.json`, which is how a smoke test stays away from the real game files.
+- `ViewModels/TrayViewModel` holds everything the menu does, behind the ports `IUserPrompts`,
+  `INotifier` and `IFileOpener`, so it is tested without WPF. `UpdatesViewModel` runs the update
+  check and install.
+- `Shell/TrayMenu` rebuilds the menu from the view models on every change, `Shell/TrayIcon` wraps
+  `H.NotifyIcon`, and `Shell/StatusIconFactory` draws the vision-cone icon as a multi-size `.ico` in
+  the status color.
+- `Theming` follows CodePrint's theme contract. `ThemeApplier` switches WPF UI's light, dark or
+  high-contrast theme and sets the app's semantic brushes from `ThemePalette`. In System mode it
+  follows Windows without a restart. `Theming/Theme.xaml` replaces WPF UI's `Window` style, which
+  breaks windows made in code (docs/pitfalls.md).
+- `Startup/SingleInstance` keeps one copy per user, `Startup/StartupOptions` reads `--settings`, and
+  `Composition/AppGraph` is the only composition root.
 
-`Core/Updates/UpdateService` is the update seam from ADR 0003 and ADR 0006: `manifest.json` and
-`manifest.sig` on the latest release, the signature checked against the public key built in from
-`contracts/keys/`, the version policy, the installer artifact, a download checked against the signed
-size and SHA-256, then the installer launch.
-`Infrastructure/Updates` has the GitHub channel, the ECDSA verifier and the launcher, and
-`App/ViewModels/UpdatesViewModel` runs them from the menu. `installer/` holds the Inno Setup script
-and `build-installer.ps1`, and `release-windows.yml` builds a draft release from a `v2.*` tag.
+## Data flow
 
-`App/Theming` follows CodePrint's theme contract. `ThemeApplier` switches WPF UI's light, dark or
-high-contrast theme, which styles the tray menu and the standard controls, and sets the app's own
-semantic brushes (`ThemeTokens`, from `ThemePalette`). The mode (System, Light or Dark) is a setting
-in `config.json`. In System mode it follows Windows and changes with it without a restart.
-`dotnetlib` has no theme tokens or menu styles to reuse yet: its theming lives in its preview app.
+1. Start: load `config.json`. On the very first run, locate `gameinfo.gi` and keep the value already
+   in it.
+2. Apply: merge the FOV plus, when enabled, the stored tweaks, writing at most once per file and only
+   if something changed. The first write to each file copies it to `<name>.dlfovfixer.bak`.
+3. Watch: the watcher re-applies three seconds after a game update stops writing the file, and a
+   timer re-applies every `periodic_check_minutes` as the fallback.
+4. Status: the icon is green when the file holds the target value, amber when the value is absent,
+   different or the file is locked, and red when the file cannot be found or read.
 
-`.github/workflows/ci.yml` runs on every pull request and every push to `main`. It checks .NET
-formatting, builds with warnings as errors, runs the .NET tests with TRX results uploaded even on
-failure, and runs the Python tests.
+## Delivery
+
+`installer/build-installer.ps1` publishes a self-contained build (a plain folder, not a single-file
+bundle, ADR 0002), compiles the per-user Inno Setup installer, and writes its SHA-256,
+`manifest.json` and `manifest.sig`. `.github/workflows/release-windows.yml` does that on a `v*` tag
+and creates a draft release. The installer closes a running copy through the Restart Manager, starts
+it again after an update, and on uninstall stops it and leaves `%APPDATA%` alone. The manifest is
+signed with the key on the owner's offline drive and in the `DLFOVFIXER_MANIFEST_SIGNING_KEY`
+secret. There is no code-signing certificate, so SmartScreen warns once on a browser download.
+
+`.github/workflows/ci.yml` checks formatting, builds with warnings as errors, runs the tests with TRX
+results uploaded even on failure, and parse-checks every PowerShell script.
+
+## Known constraints
+
+- **The game holds the file open while it runs.** Writes fail with a sharing violation, which is a
+  normal transient state (`Waiting`) rather than an error.
+- **Windows only**, by construction: the registry for Steam discovery and for the `Run` value, WPF
+  for the shell.
+- **The installer is not code-signed.** SmartScreen asks once per downloaded version. Updates from
+  inside the app are not affected, because they are trusted through the signed manifest and carry no
+  mark-of-the-web.
+- **Deadlock may one day block matchmaking for changed ConVars.** Nothing confirms it yet. It is on
+  the board to watch.
