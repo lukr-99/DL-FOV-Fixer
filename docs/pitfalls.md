@@ -104,7 +104,8 @@ A pitfall that could hit another repository is also reported to CodePrint. CodeP
   a display, so nothing compiled the broken file.
 - Fix: write the escapes again, and check a changed Python file with `py -m py_compile` before
   committing it.
-- Closed off by: `tests/test_compile.py`, which compiles every module in `dlfovfixer/`.
+- Closed off by: `tests/test_compile.py`, which compiled every module in `dlfovfixer/` until the
+  Python app was removed in 2.0.0. The trap itself still applies to any file edited through a shell.
 - Seen: 2026-09-30, the 1.0.2 updater bridge, in review before it was merged.
 
 ## Replacing a file the game holds open says "access denied", not "in use"
@@ -153,7 +154,7 @@ A pitfall that could hit another repository is also reported to CodePrint. CodeP
 - Fix: end the pattern with a line-break lookahead, `(?=\r?\n|\Z)`, instead of `$`. In .NET write
   `\z`, because .NET's `\Z` also matches before a final `\n`.
 - Closed off by: the CRLF form of every case in `contracts/vectors/gameinfo-merge.json` and
-  `gameinfo-apply.json`, run by `tests/test_vectors.py` and by `DlFovFixer.Core.Tests`. Removing the
+  `gameinfo-apply.json`, run by `DlFovFixer.Core.Tests` (and by the Python tests until 2.0.0). Removing the
   `\r?` from the C# lookahead fails four of them.
 - Seen: 2026-09, in `gameinfo._merge_one`.
 

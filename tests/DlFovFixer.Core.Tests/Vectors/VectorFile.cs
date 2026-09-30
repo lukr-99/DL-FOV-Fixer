@@ -5,7 +5,7 @@ namespace DlFovFixer.Core.Tests.Vectors;
 
 /// <summary>
 /// Reads the shared behavior vectors in contracts/vectors, which the build copies next to the
-/// tests. The Python tests read the same files (tests/test_vectors.py).
+/// tests. The retired Python 1.x app was tested against the same files until 2.0.0.
 /// </summary>
 internal static class VectorFile
 {
@@ -76,7 +76,7 @@ internal static class VectorFile
     public static string[] PairTexts(IEnumerable<KeyMerge> results) =>
         [.. results.Select(result => $"{result.Key}={Code(result.Action)}")];
 
-    /// <summary>The action names the vectors use, which are the Python app's.</summary>
+    /// <summary>The action names the vectors use, which are the Python 1.x app's.</summary>
     public static string Code(MergeAction action) => action switch
     {
         MergeAction.Updated => "updated",

@@ -2,11 +2,11 @@
 
 ## Required context
 
-1. [ARCHITECTURE.md](ARCHITECTURE.md) before changing module boundaries. It describes the Python app
-   that ships today.
+1. [ARCHITECTURE.md](ARCHITECTURE.md) before changing module boundaries. It describes the C# app that
+   ships today. The Python 1.x app was retired with 2.0.0 and lives on only in the Git history.
 2. [CONTEXT.md](CONTEXT.md) before introducing a domain word.
-3. [docs/csharp-rewrite.md](docs/csharp-rewrite.md) and [docs/adr/](docs/adr/) before starting work on
-   the C# port, or before deciding anything the ADRs already decided.
+3. [docs/adr/](docs/adr/) before deciding anything the ADRs already decided.
+   [docs/csharp-rewrite.md](docs/csharp-rewrite.md) is the finished plan of the rewrite, kept as history.
 4. [docs/pitfalls.md](docs/pitfalls.md) when something fails in a way you did not expect. Search it
    and CodePrint's `docs/pitfalls/` for the error text before debugging. CodePrint usually sits beside
    this repository; find it by name if it does not.
@@ -17,8 +17,8 @@
 - Constructor injection and one explicit composition root. Domain code does not reach for UI, files,
   the registry or the network.
 - Add or update deterministic tests with every behavior change.
-- Behavior that both implementations must share lives in `contracts/vectors/`, and both test suites
-  read those files rather than keeping their own copies.
+- Behavior the app must keep lives as data in `contracts/vectors/`, and the tests read those files
+  rather than keeping their own copies.
 - Conventional Commits, and several coherent commits when a change has independent slices.
 - Never leave the repository in a failing state, and never commit a signing certificate, a password or
   a machine path.
@@ -54,12 +54,11 @@ Cover a change to that code with a vector in `contracts/vectors/`, not only with
 ## Verification
 
 ```powershell
-py -m pytest -q
 dotnet format DL-FOV-Fixer.slnx --verify-no-changes
 dotnet build DL-FOV-Fixer.slnx -c Release
 dotnet test --solution DL-FOV-Fixer.slnx -c Release --no-build
 py ..\CodePrint\tools\validate_repository.py --root .
 ```
 
-Use `py`, not `python`. The `python` command can resolve to the Microsoft Store build, which writes to
-a private copy of `%APPDATA%` (see [docs/pitfalls.md](docs/pitfalls.md)).
+Use `py`, not `python`, for the CodePrint validator. The `python` command can resolve to the Microsoft
+Store build, which writes to a private copy of `%APPDATA%` (see [docs/pitfalls.md](docs/pitfalls.md)).

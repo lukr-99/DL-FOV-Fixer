@@ -1,7 +1,7 @@
 name: CI
 
-# Both implementations on every push to main and every pull request. The Python app still ships
-# until the C# port passes the shared vectors (docs/csharp-rewrite.md), so both jobs run.
+# Format, build and tests on every push to main and every pull request. The Python 1.x app was
+# retired with 2.0.0 (docs/csharp-rewrite.md, M7).
 
 on:
   push:
@@ -69,22 +69,3 @@ jobs:
           name: dotnet-test-results
           path: TestResults/
           if-no-files-found: warn
-
-  python:
-    name: Python tests
-    runs-on: windows-latest
-    timeout-minutes: 10
-
-    steps:
-      - uses: actions/checkout@v7
-
-      - name: Set up Python
-        uses: actions/setup-python@v7
-        with:
-          python-version: "3.12"
-
-      - name: Install dependencies
-        run: python -m pip install -r requirements.txt pytest
-
-      - name: Test
-        run: python -m pytest -q

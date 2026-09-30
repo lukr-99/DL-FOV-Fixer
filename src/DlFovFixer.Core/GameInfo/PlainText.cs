@@ -1,8 +1,8 @@
 namespace DlFovFixer.Core.GameInfo;
 
 /// <summary>
-/// Whitespace and line rules shared with the Python app, so both split and trim pasted text the
-/// same way. .NET's own Trim does not treat U+001C to U+001F as whitespace, and Python does.
+/// Whitespace and line rules that match the Python 1.x app, so pasted text splits and trims the way
+/// it always did. .NET's own Trim does not treat U+001C to U+001F as whitespace, and Python does.
 /// </summary>
 internal static class PlainText
 {
