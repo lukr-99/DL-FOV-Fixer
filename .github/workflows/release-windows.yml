@@ -18,7 +18,7 @@ concurrency:
 
 jobs:
   release:
-    name: Signed installer
+    name: Installer and signed manifest
     runs-on: windows-latest
     timeout-minutes: 30
 
@@ -50,13 +50,14 @@ jobs:
             if ($LASTEXITCODE -ne 0) { throw 'Installing Inno Setup failed.' }
           }
 
-      - name: Build and sign the installer
+      - name: Build the installer and sign the manifest
         shell: pwsh
         env:
           WINDOWS_CERT_PFX_BASE64: ${{ secrets.WINDOWS_CERT_PFX_BASE64 }}
           WINDOWS_CERT_PASSWORD: ${{ secrets.WINDOWS_CERT_PASSWORD }}
-          # The certificate's common name. The app accepts update installers only from it.
-          DLFOVFIXER_PUBLISHER: ${{ vars.DLFOVFIXER_PUBLISHER }}
+          # The update channel's key. The app installs an update only when manifest.json is signed
+          # with it (ADR 0006). The certificate above is optional and only quiets SmartScreen.
+          DLFOVFIXER_MANIFEST_SIGNING_KEY: ${{ secrets.DLFOVFIXER_MANIFEST_SIGNING_KEY }}
         run: ./installer/build-installer.ps1 -Release
 
       - name: Report signing status
@@ -84,3 +85,4 @@ jobs:
             artifacts/DL-FOV-Fixer-*-setup.exe
             artifacts/DL-FOV-Fixer-*-setup.exe.sha256
             artifacts/manifest.json
+            artifacts/manifest.sig

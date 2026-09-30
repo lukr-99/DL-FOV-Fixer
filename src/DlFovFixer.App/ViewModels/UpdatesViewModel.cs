@@ -78,6 +78,9 @@ public sealed class UpdatesViewModel(
                 }
 
                 break;
+            case UpdateCheckResult.BadSignature when interactive:
+                notifier.Notify("The latest release is not signed with the app's key. Nothing was downloaded.");
+                break;
             case UpdateCheckResult.BadManifest bad when interactive:
                 notifier.Notify($"The latest release did not pass the app's checks ({bad.Reason}). Nothing was downloaded.");
                 break;
@@ -121,9 +124,6 @@ public sealed class UpdatesViewModel(
                 break;
             case InstallResult.DownloadCorrupted:
                 notifier.Notify("The download does not match the release. Nothing was installed.");
-                break;
-            case InstallResult.Untrusted:
-                notifier.Notify("The installer is not signed by the expected publisher. Nothing was installed.");
                 break;
             case InstallResult.Failed failed:
                 notifier.Notify($"Update install failed: {failed.Detail}");

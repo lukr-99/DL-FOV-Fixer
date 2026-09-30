@@ -20,6 +20,9 @@ public sealed partial class ReleaseChannelAddress
     /// <summary>The latest release's manifest.</summary>
     public string Manifest => _root + "/releases/latest/download/manifest.json";
 
+    /// <summary>The detached signature over the latest release's manifest.</summary>
+    public string Signature => _root + "/releases/latest/download/manifest.sig";
+
     /// <summary>The latest release's page, where the user can download a release by hand.</summary>
     public string ReleasesPage => _root + "/releases/latest";
 

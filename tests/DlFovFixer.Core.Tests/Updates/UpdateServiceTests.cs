@@ -9,10 +9,10 @@ public sealed class UpdateServiceTests
 
     private readonly FakeChannel _channel = new();
     private readonly FakeInstaller _installer = new();
-    private bool _trusted = true;
+    private bool _signatureValid = true;
 
     [Fact]
-    public async Task Check_NoPinnedPublisher_IsNotConfiguredAndFetchesNothing()
+    public async Task Check_NoManifestKey_IsNotConfiguredAndFetchesNothing()
     {
         var result = await Service(configured: false).CheckAsync(TestContext.Current.CancellationToken);
 
@@ -61,6 +61,36 @@ public sealed class UpdateServiceTests
     }
 
     [Fact]
+    public async Task Check_SignatureDoesNotMatch_IsRefusedBeforeTheManifestIsRead()
+    {
+        _channel.Manifest = Manifest("2.0.1");
+        _signatureValid = false;
+
+        var result = await Service().CheckAsync(TestContext.Current.CancellationToken);
+
+        Assert.IsType<UpdateCheckResult.BadSignature>(result);
+    }
+
+    [Fact]
+    public async Task Check_SignatureIsCheckedOverTheExactManifestBytes()
+    {
+        _channel.Manifest = Manifest("2.0.1");
+        byte[]? checkedBytes = null;
+        string? checkedSignature = null;
+        var service = new UpdateService("2.0.0", true, _channel, new FakeSignatures((bytes, signature) =>
+        {
+            checkedBytes = bytes;
+            checkedSignature = signature;
+            return true;
+        }), _installer);
+
+        await service.CheckAsync(TestContext.Current.CancellationToken);
+
+        Assert.Equal(Encoding.UTF8.GetBytes(_channel.Manifest), checkedBytes);
+        Assert.Equal("c2lnbmF0dXJl", checkedSignature);
+    }
+
+    [Fact]
     public async Task Check_BrokenManifest_SaysWhy()
     {
         _channel.Manifest = "{}";
@@ -106,19 +136,6 @@ public sealed class UpdateServiceTests
         Assert.Empty(_installer.Launched);
     }
 
-    [Fact]
-    public async Task Install_NotFromThePinnedPublisher_IsNeverStarted()
-    {
-        var update = await Available();
-        _channel.Download = new DownloadedArtifact(@"C:\Temp\setup.exe", 1234, Hash);
-        _trusted = false;
-
-        var result = await Service().InstallAsync(update, TestContext.Current.CancellationToken);
-
-        Assert.IsType<InstallResult.Untrusted>(result);
-        Assert.Empty(_installer.Launched);
-    }
-
     private async Task<UpdateCheckResult.Available> Available()
     {
         _channel.Manifest = Manifest("2.0.1");
@@ -126,7 +143,7 @@ public sealed class UpdateServiceTests
     }
 
     private UpdateService Service(bool configured = true, string installed = "2.0.0") =>
-        new(installed, configured, _channel, new FakePublisher(() => _trusted), _installer);
+        new(installed, configured, _channel, new FakeSignatures((_, _) => _signatureValid), _installer);
 
     private static string Manifest(string version, string kind = "installer") => $$"""
         {"schema":1,"version":"{{version}}","publishedAt":"2026-10-01T12:00:00Z",
@@ -143,19 +160,21 @@ public sealed class UpdateServiceTests
 
         public int Fetches { get; private set; }
 
-        public Task<byte[]> FetchManifestAsync(CancellationToken cancellationToken)
+        public Task<ChannelSnapshot> FetchLatestAsync(CancellationToken cancellationToken)
         {
             Fetches++;
-            return Failure is null ? Task.FromResult(Encoding.UTF8.GetBytes(Manifest)) : Task.FromException<byte[]>(Failure);
+            return Failure is null
+                ? Task.FromResult(new ChannelSnapshot(Encoding.UTF8.GetBytes(Manifest), "c2lnbmF0dXJl"))
+                : Task.FromException<ChannelSnapshot>(Failure);
         }
 
         public Task<DownloadedArtifact> DownloadAsync(string path, CancellationToken cancellationToken) =>
             Task.FromResult(Download!);
     }
 
-    private sealed class FakePublisher(Func<bool> trusted) : IPublisherCheck
+    private sealed class FakeSignatures(Func<byte[], string, bool> verify) : ISignatureVerifier
     {
-        public bool IsTrusted(string localPath) => trusted();
+        public bool Verify(ReadOnlySpan<byte> data, string signatureBase64) => verify(data.ToArray(), signatureBase64);
     }
 
     private sealed class FakeInstaller : IUpdateInstaller

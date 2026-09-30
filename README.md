@@ -30,15 +30,15 @@ This app remembers your chosen value and re-applies it for you.
 Get `DL-FOV-Fixer.exe` from the
 [latest release](https://github.com/lukr-99/DL-FOV-Fixer/releases/latest).
 
-The release is **not code-signed yet**, so Windows is suspicious of it the first time:
+The release is **not code-signed**, so Windows is suspicious of it the first time:
 
 - **SmartScreen** shows "Windows protected your PC". Click **More info**, then
   **Run anyway**. It only asks once per version.
 - **Microsoft Defender** may report the file as a trojan. That is a false positive:
   the app is built with PyInstaller, whose self-extracting starter is the same one a
   lot of real malware uses, and Defender matches that pattern, not anything this app
-  does. The source is all in this repository if you want to check. A signed release
-  and a rewrite that does not use PyInstaller are both on the way.
+  does. The source is all in this repository if you want to check. A rewrite that does
+  not use PyInstaller is on the way.
 
 To check that your download is the file the release built, compare its SHA-256 with
 the `DL-FOV-Fixer.exe.sha256` file on the same release (published from the first
@@ -48,9 +48,9 @@ release after 1.0.2 on):
 (Get-FileHash .\DL-FOV-Fixer.exe -Algorithm SHA256).Hash.ToLower()
 ```
 
-Once releases are signed, right-click the file, choose **Properties**, then
-**Digital Signatures**, and check the signer is Lukáš Krejčí. Or run
-`Get-AuthenticodeSignature .\DL-FOV-Fixer.exe` and look for `Valid`.
+The coming 2.x version updates itself safely without a certificate: each release's
+`manifest.json` is signed with the project's own key, and the app installs an update
+only when that signature and the file's SHA-256 match.
 
 ## Status at a glance
 

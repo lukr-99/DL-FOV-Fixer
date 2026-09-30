@@ -163,18 +163,20 @@ public sealed class UpdatesViewModelTests
 
         public int Fetches { get; private set; }
 
-        public Task<byte[]> FetchManifestAsync(CancellationToken cancellationToken)
+        public Task<ChannelSnapshot> FetchLatestAsync(CancellationToken cancellationToken)
         {
             Fetches++;
-            return Failure is null ? Task.FromResult(Encoding.UTF8.GetBytes(Manifest)) : Task.FromException<byte[]>(Failure);
+            return Failure is null
+                ? Task.FromResult(new ChannelSnapshot(Encoding.UTF8.GetBytes(Manifest), "c2ln"))
+                : Task.FromException<ChannelSnapshot>(Failure);
         }
 
         public Task<DownloadedArtifact> DownloadAsync(string path, CancellationToken cancellationToken) => Task.FromResult(Download);
     }
 
-    private sealed class TrustAll : IPublisherCheck
+    private sealed class TrustAll : ISignatureVerifier
     {
-        public bool IsTrusted(string localPath) => true;
+        public bool Verify(ReadOnlySpan<byte> data, string signatureBase64) => true;
     }
 
     private sealed class RecordingInstaller(List<string> launched) : IUpdateInstaller

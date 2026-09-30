@@ -11,3 +11,6 @@
 
 # A gameinfo.gi fixture must reach the tests byte for byte, CRLF and LF cases alike.
 *.gi -text
+
+# Signed bytes: the signature covers manifest.json exactly, so its line endings must never change.
+tests/DlFovFixer.Infrastructure.Tests/Fixtures/ManifestSigning/* -text

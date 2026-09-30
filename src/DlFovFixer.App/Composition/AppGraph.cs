@@ -29,6 +29,7 @@ public sealed class AppGraph : IDisposable
     private readonly TrayViewModel _model;
     private readonly UpdatesViewModel _updates;
     private readonly HttpClient _http;
+    private readonly EcdsaSignatureVerifier? _signatures;
     private readonly ThemeApplier _theme;
     private readonly DispatcherTimer _timer = new();
     private readonly GameInfoWatcher _watcher = new(WatcherQuietPeriod);
@@ -67,11 +68,13 @@ public sealed class AppGraph : IDisposable
         _http.DefaultRequestHeaders.UserAgent.ParseAdd($"DL-FOV-Fixer/{build.Version}");
         var address = new ReleaseChannelAddress(RepositoryUrl);
         var downloads = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "DL-FOV-Fixer", "Updates");
+        var hasKey = build.ManifestPublicKey.Length > 0;
+        _signatures = hasKey ? new EcdsaSignatureVerifier(build.ManifestPublicKey) : null;
         var service = new UpdateService(
             build.Version,
-            channelConfigured: build.Publisher.Length > 0,
+            channelConfigured: hasKey,
             new GitHubReleaseChannel(_http, address, downloads),
-            new AuthenticodePublisherCheck(build.Publisher),
+            _signatures ?? (ISignatureVerifier)new NoSignatureVerifier(),
             new InstallerLauncher());
         _updates = new UpdatesViewModel(service, build.Version, address.ReleasesPage, prompts, _tray, opener);
 
@@ -127,5 +130,6 @@ public sealed class AppGraph : IDisposable
         _theme.Dispose();
         _tray.Dispose();
         _http.Dispose();
+        _signatures?.Dispose();
     }
 }

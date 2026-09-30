@@ -131,10 +131,11 @@ the fix three seconds after a game update stops writing gameinfo.gi, and the per
 the fallback for a change the watcher misses. `--settings <path>` runs
 the app on another `config.json`, which is how a smoke test stays away from the real game files.
 
-`Core/Updates/UpdateService` is the update seam from ADR 0003: `manifest.json` on the latest release,
-the version policy, the installer artifact, a download checked against the manifest's size and
-SHA-256 and against the publisher pinned at build time, then the installer launch.
-`Infrastructure/Updates` has the GitHub channel, the Authenticode check and the launcher, and
+`Core/Updates/UpdateService` is the update seam from ADR 0003 and ADR 0006: `manifest.json` and
+`manifest.sig` on the latest release, the signature checked against the public key built in from
+`contracts/keys/`, the version policy, the installer artifact, a download checked against the signed
+size and SHA-256, then the installer launch.
+`Infrastructure/Updates` has the GitHub channel, the ECDSA verifier and the launcher, and
 `App/ViewModels/UpdatesViewModel` runs them from the menu. `installer/` holds the Inno Setup script
 and `build-installer.ps1`, and `release-windows.yml` builds a draft release from a `v2.*` tag.
 
