@@ -2,7 +2,8 @@
 
 Status: M2 (scaffold), M3 (the merge in Core, against shared vectors) and M4 (the Windows adapters
 and the apply use case) are in place. The C# app does not run yet: the tray shell is M5. The Python tray app in `dlfovfixer/` is still what ships, and it stays on `main`
-until the C# app does everything it does.
+until the C# app does everything it does. The delivery half of M6 exists too: the Inno Setup
+installer (`installer/`) and the `v2.*` release workflow that publishes a draft release.
 
 ## Why
 
