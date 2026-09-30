@@ -17,8 +17,8 @@ internal static class VectorFile
         return document.RootElement.Clone();
     }
 
-    public static JsonElement Case(string file, string name) =>
-        Load(file).GetProperty("cases").EnumerateArray().Single(c => c.GetProperty("name").GetString() == name);
+    public static JsonElement Case(string file, string name, string section = "cases") =>
+        Load(file).GetProperty(section).EnumerateArray().Single(c => c.GetProperty("name").GetString() == name);
 
     /// <summary>Every case in LF form, plus a CRLF form when the case has text input.</summary>
     public static TheoryData<string, bool> CasesWithLineEndings(string file)

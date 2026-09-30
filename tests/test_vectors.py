@@ -157,4 +157,6 @@ def test_presets_and_default():
 def test_every_vector_file_is_read():
     read = {"gameinfo-merge.json", "gameinfo-apply.json", "video-config.json",
             "tweak-parsing.json", "fov-value.json"}
-    assert set(os.listdir(VECTORS)) - {"README.md"} == read
+    # The 2.0 update channel exists only in the C# app. The Python updater is the 1.x one.
+    csharp_only = {"semantic-version.json", "release-channel.json"}
+    assert set(os.listdir(VECTORS)) - {"README.md"} == read | csharp_only

@@ -1,6 +1,6 @@
 # Behavior vectors
 
-These files describe what the merge must do, as data. The Python tests (`tests/test_vectors.py`)
+These files describe what the app must do, as data. The Python tests (`tests/test_vectors.py`)
 and the C# tests (`tests/DlFovFixer.Core.Tests`) both read them, so a case added here is a case both
 implementations must pass. Neither suite keeps its own copy.
 
@@ -11,6 +11,11 @@ implementations must pass. Neither suite keeps its own copy.
 | `video-config.json` | Merging `setting.*` entries into `cfg/video.txt`, including creating it |
 | `tweak-parsing.json` | Sorting a pasted config into ConVars, SceneSystem and video entries, and merging stored lists |
 | `fov-value.json` | Which typed values are accepted, the FOV in degrees, and the menu presets |
+| `semantic-version.json` | Reading and ordering versions, and which release the app is offered (C# only) |
+| `release-channel.json` | The update channel's addresses, which artifact paths may be downloaded, and which manifests are accepted (C# only) |
+
+The two update files have no Python runner, because the 2.0 update channel exists only in the C#
+app. The Python coverage test lists them as C# only.
 
 ## Rules every runner follows
 
@@ -26,7 +31,7 @@ implementations must pass. Neither suite keeps its own copy.
 
 Write the input by hand, and say in the name what the case proves. Take the expected output from
 running the current Python app, then read it line by line before committing it: the vector is the
-contract, so a wrong expectation locks in a bug. A new file needs a runner on both sides, and both
+contract, so a wrong expectation locks in a bug. A new file needs a runner on both sides, unless it covers code only the C# app has, and both
 suites fail when a file has none.
 
 Some expectations record today's behavior rather than an ideal one, and a change to them is a
