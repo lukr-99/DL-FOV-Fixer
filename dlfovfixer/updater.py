@@ -35,7 +35,8 @@ class ReleaseInfo:
     html_url: str
     body: str
     version: tuple[int, ...]
-    asset: ReleaseAsset
+    # None when the release has no installable asset. It must then be installed by hand.
+    asset: Optional[ReleaseAsset]
 
 
 def current_version() -> str:
@@ -77,21 +78,24 @@ def _request_json(url: str, timeout: float) -> Optional[dict]:
     return data if isinstance(data, dict) else None
 
 
+INSTALLABLE_ASSET_NAME = "DL-FOV-Fixer.exe"
+
+
 def select_asset(assets: Iterable[dict]) -> Optional[ReleaseAsset]:
-    """Pick the Windows executable asset the updater can install."""
-    candidates: list[ReleaseAsset] = []
+    """Pick the one asset the updater may install: exactly DL-FOV-Fixer.exe.
+
+    Windows file names are case-insensitive, so the case is ignored. Any other
+    name (an installer, a portable build) is refused.
+    """
     for asset in assets:
         if not isinstance(asset, dict):
             continue
         name = str(asset.get("name") or "")
         url = str(asset.get("browser_download_url") or "")
-        if not name.lower().endswith(".exe") or not url:
+        if name.lower() != INSTALLABLE_ASSET_NAME.lower() or not url:
             continue
-        lowered = name.lower()
-        candidates.append(ReleaseAsset(name=name, download_url=url, size=asset.get("size")))
-    if not candidates:
-        return None
-    return sorted(candidates, key=lambda item: ("dl-fov-fixer" not in item.name.lower(), item.name))[0]
+        return ReleaseAsset(name=name, download_url=url, size=asset.get("size"))
+    return None
 
 
 def latest_release(timeout: float = 10.0) -> Optional[ReleaseInfo]:
@@ -104,8 +108,6 @@ def latest_release(timeout: float = 10.0) -> Optional[ReleaseInfo]:
     if version is None or current is None or not is_newer(version, current):
         return None
     asset = select_asset(data.get("assets") or [])
-    if asset is None:
-        return None
     return ReleaseInfo(
         tag=tag,
         name=str(data.get("name") or tag),
@@ -117,6 +119,8 @@ def latest_release(timeout: float = 10.0) -> Optional[ReleaseInfo]:
 
 
 def download_asset(release: ReleaseInfo, timeout: float = 30.0) -> str:
+    if release.asset is None:
+        raise ValueError("This release has no installable asset.")
     filename = os.path.basename(release.asset.name) or "DL-FOV-Fixer-update.exe"
     target = os.path.join(tempfile.gettempdir(), filename)
     req = urllib.request.Request(

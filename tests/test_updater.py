@@ -54,17 +54,59 @@ def test_latest_release_ignores_current_version(monkeypatch):
     assert updater.latest_release() is None
 
 
-def test_latest_release_requires_exe_asset(monkeypatch):
-    monkeypatch.setattr(updater, "_request_json", lambda _url, _timeout: {
-        "tag_name": "v99.0.0",
-        "name": "v99.0.0",
-        "html_url": "https://example.invalid/releases/v99.0.0",
+def _asset(name):
+    return {"name": name, "browser_download_url": f"https://example.invalid/{name}"}
+
+
+def _release(tag, *names):
+    return {
+        "tag_name": tag,
+        "name": tag,
+        "html_url": f"https://example.invalid/releases/{tag}",
         "draft": False,
         "prerelease": False,
-        "assets": [
-            {"name": "source.zip", "browser_download_url": "https://example.invalid/source.zip"}
-        ],
-    })
+        "assets": [_asset(name) for name in names],
+    }
+
+
+def test_select_asset_accepts_exact_name_case_insensitively():
+    asset = updater.select_asset([_asset("dl-fov-fixer.EXE")])
+
+    assert asset is not None
+    assert asset.name == "dl-fov-fixer.EXE"
+
+
+def test_select_asset_refuses_installer():
+    assert updater.select_asset([_asset("DL-FOV-Fixer-2.0.0-setup.exe")]) is None
+
+
+def test_select_asset_refuses_portable_name():
+    assert updater.select_asset([_asset("dl-fov-fixer-portable.exe")]) is None
+
+
+def test_latest_release_with_only_installer_is_manual(monkeypatch):
+    monkeypatch.setattr(updater, "_request_json", lambda _url, _timeout: _release(
+        "v99.0.0", "DL-FOV-Fixer-99.0.0-setup.exe"))
+
+    release = updater.latest_release()
+
+    assert release is not None
+    assert release.asset is None
+    assert release.html_url == "https://example.invalid/releases/v99.0.0"
+
+
+def test_latest_release_with_no_assets_is_manual(monkeypatch):
+    monkeypatch.setattr(updater, "_request_json", lambda _url, _timeout: _release("v99.0.0", "source.zip"))
+
+    release = updater.latest_release()
+
+    assert release is not None
+    assert release.asset is None
+
+
+def test_latest_release_older_gives_nothing(monkeypatch):
+    monkeypatch.setattr(updater, "_request_json", lambda _url, _timeout: _release(
+        "v0.0.1", "DL-FOV-Fixer.exe"))
 
     assert updater.latest_release() is None
 
