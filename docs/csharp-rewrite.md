@@ -3,9 +3,9 @@
 Status: M2 (scaffold), M3 (the merge in Core, against shared vectors), M4 (the Windows adapters and
 the apply use case) and M5 (the tray shell) are in place, and so is the code half of M6: the update
 seam, the Inno Setup installer in `installer/` and the `v2.*` release workflow, which publishes a
-draft release. What M6 still needs is the code-signing certificate, since a release build refuses to
-go out unsigned or without a pinned publisher, and the 1.0.2 bridge release. The Python tray app in
-`dlfovfixer/` is still what ships, and it stays on `main` until the C# app does everything it does.
+draft release. Updates are trusted through a signed manifest instead of a code-signing certificate
+(ADR 0006), so M6 needs nothing bought. The 1.0.2 bridge shipped on 2026-09-30. The Python tray app
+in `dlfovfixer/` is still what ships, and it stays on `main` until the C# app does everything it does.
 
 Where the C# app differs from 1.0 on purpose:
 
@@ -16,7 +16,7 @@ Where the C# app differs from 1.0 on purpose:
 - The menu and the dialogs follow Windows' light or dark setting, or a theme chosen in the menu.
   1.0 had no theme support. Messages use the app's own window instead of the Win32 message box,
   which cannot be themed.
-- A build that cannot update itself, a dev build or one without a pinned publisher, offers the
+- A build that cannot update itself, a dev build or one without the manifest key, offers the
   releases page from "Check for updates" instead.
 
 ## Why
@@ -63,7 +63,8 @@ These are promises the current app already makes, and the port keeps every one o
 |---|---|
 | [0001](adr/0001-rewrite-the-tray-app-in-csharp.md) | C# on .NET 10, WPF shell, Core plus Infrastructure plus App |
 | [0002](adr/0002-a-per-user-installer-replaces-the-portable-exe.md) | Signed per-user installer, self-contained, replaces the portable exe |
-| [0003](adr/0003-updates-through-a-release-manifest-and-a-publisher-check.md) | Update channel is a release manifest plus an Authenticode publisher check |
+| [0003](adr/0003-updates-through-a-release-manifest-and-a-publisher-check.md) | Update channel is a release manifest plus an Authenticode publisher check (publisher check replaced by 0006) |
+| [0006](adr/0006-trust-updates-through-a-signed-manifest-not-a-certificate.md) | Updates are trusted through a signed manifest, not a code-signing certificate |
 | [0004](adr/0004-keep-the-config-json-contract.md) | The 1.0 `config.json` stays the settings contract |
 | [0005](adr/0005-keep-the-surgical-text-merge.md) | Keep surgical text merging, not a KeyValues round trip |
 
@@ -78,7 +79,7 @@ global.json                    pinned SDK, Microsoft.Testing.Platform runner
 version.properties             versionName=2.0.0
 src/
   DlFovFixer.Core/             net10.0. Domain and use cases. No UI, no registry, no file system.
-  DlFovFixer.Infrastructure/   net10.0-windows. File system, registry, Steam, HTTP, Authenticode.
+  DlFovFixer.Infrastructure/   net10.0-windows. File system, registry, Steam, HTTP, manifest signatures.
   DlFovFixer.App/              net10.0-windows. WPF tray shell and the composition root.
 tests/
   DlFovFixer.Core.Tests/
@@ -110,7 +111,7 @@ nothing. `App` owns the only composition root (`Composition/AppGraph.cs`).
 | `locator.py` | `Locating/SteamGameInfoLocator.cs`, `SteamLibraries.cs` behind `Core/Locating/IGameInfoLocator.cs` | Infrastructure |
 | `config.py` | `Settings/JsonSettingsStore.cs`, `SettingsDocument.cs` behind `Core/Settings/ISettingsStore.cs` | Infrastructure |
 | `startup.py` | `Startup/WindowsSignInStartup.cs` behind `Core/Startup/ISignInStartup.cs` | Infrastructure |
-| `updater.py` download and install | `Updates/GitHubReleaseChannel.cs`, `AuthenticodePublisherCheck.cs`, `InstallerLauncher.cs` | Infrastructure |
+| `updater.py` download and install | `Updates/GitHubReleaseChannel.cs`, `EcdsaSignatureVerifier.cs`, `InstallerLauncher.cs` | Infrastructure |
 | `iconfactory.py` | `Shell/StatusIconFactory.cs` | App |
 | `app.py` tray icon, menu, dialogs, timer | `Shell/`, `Views/`, `ViewModels/`, `Startup/` | App |
 | `run.pyw`, `__main__.py` | `App.xaml.cs` plus `Composition/AppGraph.cs` | App |
@@ -216,11 +217,12 @@ release channel -> version policy -> artifact selector -> verified download -> i
 ```
 
 `manifest.json` on the latest release carries the version and, per artifact, the file name, size and
-SHA-256. The downloaded installer must match that size and hash, and its Authenticode signature must
-be valid and carry the pinned publisher before it is allowed to run. Dev builds never update
-themselves, pre-releases are never offered, and the releases page stays the manual path. GoalMaker
-additionally signs the manifest itself with ECDSA P-256. That is a strictly additive hardening step
-here, and ADR 0003 records why the publisher check is enough to start with.
+SHA-256, and `manifest.sig` beside it is an ECDSA P-256 signature over its exact bytes. The app checks
+that signature against the key it was built with before it reads the manifest, and the downloaded
+installer must then match the signed size and hash before it is allowed to run (ADR 0006). Dev
+builds never update themselves, pre-releases are never offered, and the releases page stays the
+manual path. This is the scheme GoalMaker uses, and it replaced ADR 0003's Authenticode publisher
+check because no certificate is bought.
 
 ## Tests
 
@@ -251,8 +253,9 @@ here, and ADR 0003 records why the publisher check is enough to start with.
 | M6 | Updates and delivery | Update seam, installer, signed release workflow, the 1.0.2 bridge |
 | M7 | Retire Python | `dlfovfixer/` removed, docs rewritten, 2.0.0 released |
 
-M1 comes before the scaffold on purpose. It is a day of work that can retire the whole rewrite, and
-it depends only on the certificate that the Trusted release milestone is already buying.
+M1 comes before the scaffold on purpose. It is a day of work that can retire the whole rewrite. It
+was planned around a certificate that is now not being bought (ADR 0006), so it measures the
+unsigned .NET installer instead.
 
 ## Risks
 

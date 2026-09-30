@@ -11,3 +11,6 @@ publishing to the repository's releases, and the publisher check still gates exe
 the added key management would buy little here. That extra signature stays purely additive, and the
 stages (channel, version policy, artifact selection, verified download, installer launch) are each
 kept behind their own seam so it can be inserted without touching the rest.
+
+The Authenticode publisher check is replaced by ADR 0006: the manifest signature this ADR called
+an additive step is now what the update channel relies on, because no certificate is bought.

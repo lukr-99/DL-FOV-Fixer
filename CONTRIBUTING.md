@@ -33,20 +33,28 @@ Inno Setup 6 (`choco install innosetup`).
 
 ```powershell
 .\installer\build-installer.ps1            # dev build, version ends in -dev
-.\installer\build-installer.ps1 -Release   # plain version, what a release uses
+.\installer\build-installer.ps1 -Release -ManifestKeyPath 'E:\DL-FOV-Fixer-signing\release-manifest-signing.pem'
 ```
 
 The script publishes the app, compiles `installer/DL-FOV-Fixer.iss`, and writes these files to
-`artifacts/` (ignored by Git): `DL-FOV-Fixer-<version>-setup.exe`, its `.sha256`, and
-`manifest.json`. Pass `-IsccPath` if `ISCC.exe` is not on `PATH` or in the usual install folders.
+`artifacts/` (ignored by Git): `DL-FOV-Fixer-<version>-setup.exe`, its `.sha256`, `manifest.json`
+and `manifest.sig`. Pass `-IsccPath` if `ISCC.exe` is not on `PATH` or in the usual install folders.
 
-Signing only happens when `WINDOWS_CERT_PFX_BASE64` (and `WINDOWS_CERT_PASSWORD`) are set. Without
-them the build works and the files are unsigned. Do not run the installer on your own machine to
-test a build unless you want it installed. Never change the `AppId` in the `.iss` file.
+`manifest.sig` is what makes a release installable through the app's updater (ADR 0006). The script
+signs with the key in `-ManifestKeyPath` or the `DLFOVFIXER_MANIFEST_SIGNING_KEY` environment
+variable, checks that it matches `contracts/keys/release-manifest-public.b64` before it builds
+anything, and checks the signature before it ends. A dev build without a key only skips the
+signature, and `-Release` without one fails. `tools/setup-update-signing.ps1` made the key once, see
+[contracts/keys/README.md](contracts/keys/README.md).
+
+Authenticode signing is optional and only happens when `WINDOWS_CERT_PFX_BASE64` (and
+`WINDOWS_CERT_PASSWORD`) are set. It only quiets SmartScreen on a browser download. Do not run the
+installer on your own machine to test a build unless you want it installed. Never change the `AppId`
+in the `.iss` file.
 
 To release, make sure `version.properties` matches the tag, then push a tag such as `v2.0.0`.
-`.github/workflows/release-windows.yml` builds, signs and creates a draft release. Tags `v1.*` still
-go through `release.yml` for the Python build.
+`.github/workflows/release-windows.yml` builds, signs the manifest and creates a draft release.
+Tags `v1.*` still go through `release.yml` for the Python build.
 
 ## Changing the merge
 
