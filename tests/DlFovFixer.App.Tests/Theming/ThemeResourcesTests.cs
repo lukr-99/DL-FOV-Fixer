@@ -10,6 +10,7 @@ namespace DlFovFixer.App.Tests.Theming;
 /// here, because creating it starts the whole app (docs/pitfalls.md). This is the only test that
 /// creates an Application, since a process may have just one.
 /// </summary>
+[Collection(WpfApplicationCollection.Name)]
 public sealed class ThemeResourcesTests
 {
     [Fact]
