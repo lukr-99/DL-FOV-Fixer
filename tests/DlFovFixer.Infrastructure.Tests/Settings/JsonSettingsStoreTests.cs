@@ -75,6 +75,17 @@ public sealed class JsonSettingsStoreTests : IDisposable
     }
 
     [Fact]
+    public void Exists_IsFalseUntilTheFirstSave()
+    {
+        var store = new JsonSettingsStore(_folder.File("config.json"));
+        Assert.False(store.Exists);
+
+        store.Save(AppSettings.Defaults);
+
+        Assert.True(store.Exists);
+    }
+
+    [Fact]
     public void SaveThenLoad_RoundTripsEverySetting()
     {
         var store = new JsonSettingsStore(_folder.File("nested", "config.json"));

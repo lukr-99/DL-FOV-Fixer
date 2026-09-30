@@ -16,6 +16,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- The notification area icon. WPF has none of its own. -->
+    <PackageReference Include="H.NotifyIcon.Wpf" Version="2.4.1" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\DlFovFixer.Core\DlFovFixer.Core.csproj" />
     <ProjectReference Include="..\DlFovFixer.Infrastructure\DlFovFixer.Infrastructure.csproj" />
   </ItemGroup>

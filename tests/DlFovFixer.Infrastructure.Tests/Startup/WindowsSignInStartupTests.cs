@@ -39,6 +39,24 @@ public sealed class WindowsSignInStartupTests
         Assert.True(startup.IsEnabled);
     }
 
+    [Fact]
+    public void Repair_AValue10LeftBehind_PointsItAtThisExecutable()
+    {
+        _runValues["DL-FOV-Fixer"] = "\"D:\\Tools\\DL-FOV-Fixer.exe\"";
+
+        new WindowsSignInStartup(_runValues, Executable).Repair();
+
+        Assert.Equal($"\"{Executable}\"", _runValues["DL-FOV-Fixer"]);
+    }
+
+    [Fact]
+    public void Repair_StartupOff_LeavesItOff()
+    {
+        new WindowsSignInStartup(_runValues, Executable).Repair();
+
+        Assert.Empty(_runValues);
+    }
+
     private sealed class FakeRunValues : Dictionary<string, string>, IRunValues
     {
         public string? Read(string name) => TryGetValue(name, out var command) ? command : null;
