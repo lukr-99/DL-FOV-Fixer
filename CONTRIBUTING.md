@@ -1,5 +1,20 @@
 # Contributing
 
+## Getting the dotnetlib packages
+
+The tray shell uses `DotNetLib.Tray` from the private `dotnetlib` repository. It comes from
+dotnetlib's GitHub Packages feed, the `dotnetlib` source in `nuget.config`. Restore needs a token
+with the `read:packages` scope, so nobody can build the app without one. Store it once in your user
+NuGet config, never in this repository:
+
+```powershell
+gh auth refresh -s read:packages
+dotnet nuget add source https://nuget.pkg.github.com/lukr-99/index.json --name dotnetlib --username lukr-99 --password (gh auth token)
+```
+
+CI and the release workflow read the `DOTNETLIB_PACKAGES_TOKEN` repository secret, a classic PAT
+with `read:packages` only, through NuGet's `NuGetPackageSourceCredentials_dotnetlib` variable.
+
 ## Local verification
 
 Run what your change touches. CI (`.github/workflows/ci.yml`) runs the same checks on every pull

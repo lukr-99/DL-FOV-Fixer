@@ -17,6 +17,10 @@ concurrency:
 
 env:
   SOLUTION_PATH: DL-FOV-Fixer.slnx
+  # DotNetLib.Tray comes from dotnetlib's private GitHub Packages feed, the "dotnetlib" source in
+  # nuget.config. NuGet reads its credentials from this variable. The secret is a classic PAT with
+  # read:packages only. Pull requests from forks get no secrets, so their restore fails.
+  NuGetPackageSourceCredentials_dotnetlib: Username=lukr-99;Password=${{ secrets.DOTNETLIB_PACKAGES_TOKEN }}
 
 jobs:
   dotnet:
