@@ -59,8 +59,19 @@ jobs:
             "DL-FOV-Fixer.exe signature: $status" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append
           }
 
+      # A checksum after signing, since signing changes the file, so users can check their download
+      # (README, "Download and the Windows warning"). It is not an .exe, so the 1.0.0 updater,
+      # which takes any .exe asset, never picks it.
+      - name: Write the SHA-256
+        shell: pwsh
+        run: |
+          $hash = (Get-FileHash -LiteralPath 'dist/DL-FOV-Fixer.exe' -Algorithm SHA256).Hash.ToLowerInvariant()
+          [IO.File]::WriteAllText('dist/DL-FOV-Fixer.exe.sha256', "$hash  DL-FOV-Fixer.exe`n", [Text.UTF8Encoding]::new($false))
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v3
         with:
-          files: dist/DL-FOV-Fixer.exe
+          files: |
+            dist/DL-FOV-Fixer.exe
+            dist/DL-FOV-Fixer.exe.sha256
           generate_release_notes: true
