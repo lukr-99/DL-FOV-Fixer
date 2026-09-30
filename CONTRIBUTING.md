@@ -3,7 +3,7 @@
 ## Local verification
 
 Run what your change touches. CI (`.github/workflows/ci.yml`) runs the same checks on every pull
-request, and the release workflow runs the Python tests again on a `v*` tag.
+request, and the release workflow runs the Python tests again on a `v1.*` tag.
 
 ```powershell
 py -m pip install -r requirements.txt
@@ -25,6 +25,28 @@ Building the executable needs PyInstaller and produces `dist\DL-FOV-Fixer.exe`:
 ```powershell
 .\build.bat
 ```
+
+## Building the installer
+
+The C# app ships as a per-user Inno Setup installer. You need the .NET SDK from `global.json` and
+Inno Setup 6 (`choco install innosetup`).
+
+```powershell
+.\installer\build-installer.ps1            # dev build, version ends in -dev
+.\installer\build-installer.ps1 -Release   # plain version, what a release uses
+```
+
+The script publishes the app, compiles `installer/DL-FOV-Fixer.iss`, and writes these files to
+`artifacts/` (ignored by Git): `DL-FOV-Fixer-<version>-setup.exe`, its `.sha256`, and
+`manifest.json`. Pass `-IsccPath` if `ISCC.exe` is not on `PATH` or in the usual install folders.
+
+Signing only happens when `WINDOWS_CERT_PFX_BASE64` (and `WINDOWS_CERT_PASSWORD`) are set. Without
+them the build works and the files are unsigned. Do not run the installer on your own machine to
+test a build unless you want it installed. Never change the `AppId` in the `.iss` file.
+
+To release, make sure `version.properties` matches the tag, then push a tag such as `v2.0.0`.
+`.github/workflows/release-windows.yml` builds, signs and creates a draft release. Tags `v1.*` still
+go through `release.yml` for the Python build.
 
 ## Changing the merge
 
