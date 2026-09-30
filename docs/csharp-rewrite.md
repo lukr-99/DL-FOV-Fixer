@@ -2,8 +2,8 @@
 
 Status: **done.** 2.0.0 shipped on 2026-09-30 and the Python app was removed in M7. This file is
 kept as the record of the plan; [ARCHITECTURE.md](../ARCHITECTURE.md) describes the app as it is.
-Updates are trusted through a signed manifest instead of a code-signing certificate (ADR 0006). M1,
-measuring what Defender and SmartScreen do with the new installer, is still open.
+Updates are trusted through a signed manifest instead of a code-signing certificate (ADR 0006). M1
+found no detection on the 2.0.0 installer (see "M1 results" below).
 
 Where the C# app differs from 1.0 on purpose:
 
@@ -255,25 +255,29 @@ M1 comes before the scaffold on purpose. It is a day of work that can retire the
 was planned around a certificate that is now not being bought (ADR 0006), so it measures the
 unsigned .NET installer instead.
 
-### M1 results so far
+### M1 results
 
-Measured on 2026-09-30 on the owner's Windows 11 PC, Microsoft Defender platform 4.18.26080.4,
-signatures 1.459.480.0 from that day, real-time protection on:
+Measured on 2026-09-30 on the unsigned installer from the v2.0.0 release,
+`DL-FOV-Fixer-2.0.0-setup.exe`, SHA-256 `932b47a7a058ccae568d045bedcacbfbd2f85e8e03ed5c5d83a960413f0ca571`:
 
-| File | Defender custom scan |
+| Check | Result |
 |---|---|
-| `DL-FOV-Fixer-2.0.0-setup.exe` from the v2.0.0 release (unsigned) | No threats found |
-| The installed app folder, `%LOCALAPPDATA%\Programs\DL-FOV-Fixer` | No threats found |
-| The 1.x PyInstaller `DL-FOV-Fixer.exe` (for comparison) | Reported as a trojan, which is why the rewrite exists |
+| Microsoft Defender custom scan of the installer (platform 4.18.26080.4, signatures 1.459.480.0, real-time protection on) | No threats found |
+| Microsoft Defender custom scan of the installed app folder | No threats found |
+| VirusTotal file scan of the installer ([report](https://www.virustotal.com/gui/file/932b47a7a058ccae568d045bedcacbfbd2f85e8e03ed5c5d83a960413f0ca571)) | 0 of 69 engines flag it |
+| VirusTotal scan of the release download link | 0 of 92 URL scanners flag it |
+| The 1.x PyInstaller `DL-FOV-Fixer.exe`, for comparison | Reported by Defender as a trojan, which is why the rewrite exists |
 
-Not measured yet: the SmartScreen prompt on a browser download (the test file came through
-`gh release download`, which adds no mark-of-the-web), and a VirusTotal scan, which means uploading
-the installer to a third-party service.
+So the rewrite did what it was for: the self-contained .NET app in a per-user installer carries no
+detection, without a code-signing certificate. Not measured: the SmartScreen prompt on a browser
+download. It is expected, because the installer is unsigned and new, and it asks once per version
+(README, "Install").
 
 ## Risks
 
 - **The verdict may not move.** A self-contained .NET app is not automatically clean, and an
-  unsigned one is not clean at all. M1 measures this before anything is ported.
+  unsigned one is not clean at all. M1 measures this before anything is ported. (It moved: see
+  "M1 results".)
 - **Size.** The publish folder is roughly 60 to 80 MB against today's 19 MB, and WPF cannot be
   trimmed. The installer compresses it, but the download grows.
 - **The merge is the dangerous part.** It is the only code that writes into a file the game must be
