@@ -1,6 +1,7 @@
 using System.Windows;
 using DlFovFixer.App.Composition;
 using DlFovFixer.App.Startup;
+using DotNetLib.Tray;
 
 namespace DlFovFixer.App;
 
@@ -26,6 +27,7 @@ public partial class App : Application
             return;
         }
 
+        TrayResources.Merge(Resources);
         _graph = new AppGraph(BuildInfo.Current, StartupOptions.Parse(e.Args), Shutdown);
         _instance.Listen(() => Dispatcher.BeginInvoke(() => _graph?.OnLaunchedAgain()));
         _graph.Start();

@@ -70,9 +70,11 @@ A pitfall that could hit another repository is also reported to CodePrint. CodeP
   `FluentWindow`, that sets `AllowsTransparency`. A window made in code is only initialized when it
   is shown, so the style lands after the window handle exists, and WPF refuses the change.
 - Fix: `Theming/Theme.xaml`, merged after WPF UI's dictionaries, defines its own implicit `Window`
-  style that only sets the theme's background and foreground.
-- Closed off by: `ThemeResourcesTests.WindowMadeInCode_OpensInBothThemes`, which fails with the
-  message above when that style is removed (checked).
+  style that only sets the theme's background and foreground. Since the move to `DotNetLib.Tray`,
+  that style is the kit's `Themes/Tray.xaml`, which `TrayResources.Merge` adds last.
+- Closed off by: `ThemeResourcesTests.WindowMadeInCode_OpensInBothThemesWithTheWarmPalette`, which
+  failed with the message above when that style was removed (checked before the move), and the
+  kit's own `TrayResourcesTests`.
 - Seen: 2026-09-30, adding the dark theme, in an off-screen render before it shipped.
 
 ## Creating the App class in a tool or a test starts the real app
@@ -82,8 +84,8 @@ A pitfall that could hit another repository is also reported to CodePrint. CodeP
 - Cause: `new DlFovFixer.App.App()` queues WPF's startup on the dispatcher. The first time the
   dispatcher runs, `App.OnStartup` builds the whole graph with the real `config.json`, applies the
   fix and starts the timers.
-- Fix: never create the App class outside the app. Build a plain `Application` and merge the same
-  dictionaries App.xaml merges, including `Theming/Theme.xaml`, or run the app with
+- Fix: never create the App class outside the app. Build a plain `Application` and call
+  `TrayResources.Merge` on its resources, as `App.xaml.cs` does, or run the app with
   `--settings <path>` on a scratch config.
 - Closed off by: `ThemeResourcesTests` loads the resources on a plain `Application`, and its summary
   says why. No automatic check stops a new tool from making the mistake.

@@ -1,6 +1,7 @@
 using System.IO;
 using DlFovFixer.App.Shell;
 using DlFovFixer.App.Tests.Support;
+using DotNetLib.Tray;
 
 namespace DlFovFixer.App.Tests.Shell;
 
@@ -14,7 +15,7 @@ public sealed class StatusIconFactoryTests
     {
         var bytes = Sta.Run(() => StatusIconFactory.CreateIcon(color));
 
-        Assert.Equal(StatusIconFactory.Sizes.Count, BitConverter.ToInt16(bytes, 4));
+        Assert.Equal(IconFile.TraySizes.Count, BitConverter.ToInt16(bytes, 4));
         using var stream = new MemoryStream(bytes);
         using var icon = new System.Drawing.Icon(stream, 32, 32);
         Assert.Equal(32, icon.Width);

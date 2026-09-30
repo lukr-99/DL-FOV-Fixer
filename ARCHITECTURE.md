@@ -73,15 +73,17 @@ from `version.properties` and marks every build `-dev` unless it is built with
 - `ViewModels/TrayViewModel` holds everything the menu does, behind the ports `IUserPrompts`,
   `INotifier` and `IFileOpener`, so it is tested without WPF. `UpdatesViewModel` runs the update
   check and install.
-- `Shell/TrayMenu` rebuilds the menu from the view models on every change, `Shell/TrayIcon` wraps
-  `H.NotifyIcon`, and `Shell/StatusIconFactory` draws the vision-cone icon as a multi-size `.ico` in
-  the status color.
-- `Theming` follows CodePrint's theme contract. `ThemeApplier` switches WPF UI's light, dark or
-  high-contrast theme and sets the app's semantic brushes from `ThemePalette`. In System mode it
-  follows Windows without a restart. `Theming/Theme.xaml` replaces WPF UI's `Window` style, which
-  breaks windows made in code (docs/pitfalls.md).
-- `Startup/SingleInstance` keeps one copy per user, `Startup/StartupOptions` reads `--settings`, and
-  `Composition/AppGraph` is the only composition root.
+- The tray kit is the shared `DotNetLib.Tray` package from `dotnetlib` (see CONTRIBUTING.md for the
+  feed). It brings the notification area icon (`TrayIconHost`), the menu builder, WPF UI's themes,
+  the theme applier, the dialogs and the single-instance lock. The app keeps only what is its own.
+- `Shell/TrayMenu` rebuilds the menu from the view models on every change with `TrayMenuBuilder`,
+  `Shell/TrayNotifier` puts `INotifier` on the tray's balloons, and `Shell/StatusIconFactory` draws
+  the vision-cone icon in the status color and has `IconFile` make the multi-size `.ico`.
+- `Theming/WarmPalettes` are the app's light and dark `TrayPalette`s, given to `TrayThemeApplier` in
+  place of the kit's neutral ones. Views read the kit's `Tray.*` brush keys.
+- `App.xaml.cs` takes the single-instance lock, then merges the kit's resources
+  (`TrayResources.Merge`). `Startup/StartupOptions` reads `--settings`, and `Composition/AppGraph`
+  is the only composition root. It maps the saved `ThemeMode` to the kit's `TrayThemeMode`.
 
 ## Data flow
 

@@ -5,6 +5,10 @@ Every release, newest first. The version lives in `version.properties`, and a re
 
 ## Unreleased
 
+- The tray shell now uses the shared `DotNetLib.Tray` package for its icon, menu, theming, dialogs
+  and single-instance lock. The menu, the icon and the warm colors look the same. The paste dialog's
+  button now says "OK" instead of "Import".
+
 - The Python 1.x source, its tests and its release workflow are removed. 1.0.2 stays downloadable
   from its release, and the source is in the Git history at tag `v1.0.2`.
 
