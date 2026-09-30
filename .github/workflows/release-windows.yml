@@ -1,13 +1,14 @@
 name: Release Windows
 
-# The C# 2.x installer. Push a tag v2.* that matches version.properties. The release is created
-# as a DRAFT, so it can be checked before anyone (including the in-app updater) sees it.
-# The 1.x Python build ships from release.yml on v1.* tags.
+# The installer release. Push a tag vX.Y.Z that matches version.properties; a tag that does not
+# match fails the run. The release is created as a DRAFT, so it can be checked before anyone
+# (including the in-app updater) sees it. The Python 1.x app and its release.yml were retired with
+# 2.0.0, so every tag now comes here.
 
 on:
   push:
     tags:
-      - "v2.*"
+      - "v*"
 
 permissions:
   contents: write
