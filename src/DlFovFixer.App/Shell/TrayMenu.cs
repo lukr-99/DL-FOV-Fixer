@@ -1,0 +1,69 @@
+using System.Windows.Controls;
+using DlFovFixer.App.ViewModels;
+using DlFovFixer.Core.GameInfo;
+
+namespace DlFovFixer.App.Shell;
+
+/// <summary>
+/// Builds the tray menu from the view model, with the items and order 1.0 had. It is built again
+/// whenever the view model changes, so every label and check mark is current when it opens.
+/// </summary>
+public static class TrayMenu
+{
+    public static ContextMenu Build(TrayViewModel model, Action quit)
+    {
+        var settings = model.Settings;
+        var menu = new ContextMenu();
+        menu.Items.Add(Label(model.StatusLine));
+        menu.Items.Add(Label(model.TargetLine));
+        menu.Items.Add(new Separator());
+        menu.Items.Add(Item("Apply now", model.ApplyNow, bold: true));
+        menu.Items.Add(Item("Check file now", model.CheckNow));
+
+        var presets = new MenuItem { Header = "Set FOV value" };
+        foreach (var preset in FovPresets.All)
+        {
+            var value = preset.Value;
+            presets.Items.Add(Item($"{preset.Degrees}°   (r_aspectratio {value})", () => model.SetValue(value), isChecked: settings.FovValue == value));
+        }
+
+        presets.Items.Add(new Separator());
+        presets.Items.Add(Item("Custom value…", model.ChooseCustomValue));
+        menu.Items.Add(presets);
+
+        var tweaks = new MenuItem { Header = "Extra tweaks" };
+        tweaks.Items.Add(Label(model.StoredTweaksLine));
+        tweaks.Items.Add(new Separator());
+        tweaks.Items.Add(Item("Paste / import config…", model.ImportTweaks));
+        tweaks.Items.Add(Item("View stored tweaks…", model.ViewTweaks));
+        tweaks.Items.Add(Item("Clear stored tweaks…", model.ClearTweaks));
+        tweaks.Items.Add(new Separator());
+        tweaks.Items.Add(Item("Apply extra tweaks (not just FOV)", model.ToggleApplyTweaks, isChecked: settings.ApplyTweaks));
+        menu.Items.Add(tweaks);
+
+        menu.Items.Add(new Separator());
+        menu.Items.Add(Item("Open gameinfo.gi", model.OpenGameInfo));
+        menu.Items.Add(Item("Locate gameinfo.gi…", model.LocateGameInfo));
+        menu.Items.Add(new Separator());
+        menu.Items.Add(Item("Apply automatically on start", model.ToggleAutoApply, isChecked: settings.AutoApplyOnStart));
+        menu.Items.Add(Item("Start with Windows", model.ToggleSignInStartup, isChecked: model.IsSignInStartupEnabled));
+        menu.Items.Add(new Separator());
+        menu.Items.Add(Item("About", model.ShowAbout));
+        menu.Items.Add(Item("Quit", quit));
+        return menu;
+    }
+
+    private static MenuItem Label(string text) => new() { Header = text, IsEnabled = false };
+
+    private static MenuItem Item(string header, Action action, bool? isChecked = null, bool bold = false)
+    {
+        var item = new MenuItem
+        {
+            Header = header,
+            IsChecked = isChecked == true,
+            FontWeight = bold ? System.Windows.FontWeights.SemiBold : System.Windows.FontWeights.Normal,
+        };
+        item.Click += (_, _) => action();
+        return item;
+    }
+}
