@@ -93,7 +93,8 @@ leaving them implied.
 
 ## The C# port in progress
 
-The .NET solution `DL-FOV-Fixer.slnx` sits beside the Python app and ships nothing yet. It has the
+The .NET solution `DL-FOV-Fixer.slnx` sits beside the Python app. It runs as a tray app, but it ships
+nothing yet: updates and the installer are M6. It has the
 three projects from [docs/csharp-rewrite.md](docs/csharp-rewrite.md): `DlFovFixer.Core` on `net10.0`,
 and `DlFovFixer.Infrastructure` and `DlFovFixer.App` on `net10.0-windows`, each with a test project.
 `Directory.Build.props` reads the version from `version.properties` and marks every build `-dev`
@@ -117,6 +118,16 @@ implements all four:
 - `SteamGameInfoLocator`: the registry, the common Steam folders and `libraryfolders.vdf`, behind
   `IRegistryReader` so tests never touch the real registry.
 - `WindowsSignInStartup`: the `DL-FOV-Fixer` Run value, behind `IRunValues`.
+
+`Core/Applying/StatusProbe` reads the file to find one of six `FixState` values, and after an apply it
+keeps a lock or a failure until the next apply. The tray shows them as three colors.
+
+`DlFovFixer.App` is the WPF shell. `ViewModels/TrayViewModel` holds everything the menu does, behind
+the ports `IUserPrompts`, `INotifier` and `IFileOpener`, so it is tested without WPF.
+`Shell/TrayMenu` rebuilds the menu from it on every change, `Shell/TrayIcon` wraps `H.NotifyIcon`, and
+`Shell/StatusIconFactory` draws the cone icon as a multi-size `.ico`. `Startup/SingleInstance` keeps
+one copy per user, and `Composition/AppGraph` is the only composition root. `--settings <path>` runs
+the app on another `config.json`, which is how a smoke test stays away from the real game files.
 
 `.github/workflows/ci.yml` runs on every pull request and every push to `main`. It checks .NET
 formatting, builds with warnings as errors, runs the .NET tests with TRX results uploaded even on
