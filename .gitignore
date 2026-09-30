@@ -1,11 +1,6 @@
-# Python
+# Left over from the retired Python 1.x app, so old local build output stays out of Git
 __pycache__/
-*.py[cod]
-*.egg-info/
-.venv/
-venv/
-
-# PyInstaller
+.pytest_cache/
 build/
 dist/
 *.spec
