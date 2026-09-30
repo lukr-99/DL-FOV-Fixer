@@ -583,6 +583,206 @@
         ],
         "results": []
       }
+    },
+    {
+      "name": "a quoted key that exists only inside a sub-block is added at the top",
+      "input": [
+        "\"GameInfo\"",
+        "{",
+        "\tConVars",
+        "\t{",
+        "\t\t\"rate\"",
+        "\t\t{",
+        "\t\t\t\"min\"\t\"98304\"",
+        "\t\t\t\"default\"\t\"786432\"",
+        "\t\t}",
+        "\t}",
+        "}",
+        ""
+      ],
+      "block": "ConVars",
+      "quoted": true,
+      "create": true,
+      "entries": [
+        [
+          "default",
+          "1"
+        ]
+      ],
+      "expected": {
+        "output": [
+          "\"GameInfo\"",
+          "{",
+          "\tConVars",
+          "\t{",
+          "\t\t\"default\"\t\"1\"",
+          "",
+          "\t\t\"rate\"",
+          "\t\t{",
+          "\t\t\t\"min\"\t\"98304\"",
+          "\t\t\t\"default\"\t\"786432\"",
+          "\t\t}",
+          "\t}",
+          "}",
+          ""
+        ],
+        "results": [
+          [
+            "default",
+            "added"
+          ]
+        ]
+      }
+    },
+    {
+      "name": "a top-level quoted key after a sub-block with the same key is the one updated",
+      "input": [
+        "\"GameInfo\"",
+        "{",
+        "\tConVars",
+        "\t{",
+        "\t\t\"rate\"",
+        "\t\t{",
+        "\t\t\t\"default\"\t\"786432\"",
+        "\t\t}",
+        "\t\t\"default\"\t\"5\"",
+        "\t}",
+        "}",
+        ""
+      ],
+      "block": "ConVars",
+      "quoted": true,
+      "create": true,
+      "entries": [
+        [
+          "default",
+          "1"
+        ]
+      ],
+      "expected": {
+        "output": [
+          "\"GameInfo\"",
+          "{",
+          "\tConVars",
+          "\t{",
+          "\t\t\"rate\"",
+          "\t\t{",
+          "\t\t\t\"default\"\t\"786432\"",
+          "\t\t}",
+          "\t\t\"default\"\t\"1\"",
+          "\t}",
+          "}",
+          ""
+        ],
+        "results": [
+          [
+            "default",
+            "updated"
+          ]
+        ]
+      }
+    },
+    {
+      "name": "a quoted key that is a block only deeper down is added, not skipped",
+      "input": [
+        "\"GameInfo\"",
+        "{",
+        "\tConVars",
+        "\t{",
+        "\t\t\"speaker_config\"",
+        "\t\t{",
+        "\t\t\t\"surround\"",
+        "\t\t\t{",
+        "\t\t\t\t\"on\"\t\"1\"",
+        "\t\t\t}",
+        "\t\t}",
+        "\t}",
+        "}",
+        ""
+      ],
+      "block": "ConVars",
+      "quoted": true,
+      "create": true,
+      "entries": [
+        [
+          "surround",
+          "0"
+        ]
+      ],
+      "expected": {
+        "output": [
+          "\"GameInfo\"",
+          "{",
+          "\tConVars",
+          "\t{",
+          "\t\t\"surround\"\t\"0\"",
+          "",
+          "\t\t\"speaker_config\"",
+          "\t\t{",
+          "\t\t\t\"surround\"",
+          "\t\t\t{",
+          "\t\t\t\t\"on\"\t\"1\"",
+          "\t\t\t}",
+          "\t\t}",
+          "\t}",
+          "}",
+          ""
+        ],
+        "results": [
+          [
+            "surround",
+            "added"
+          ]
+        ]
+      }
+    },
+    {
+      "name": "an unquoted key that exists only inside a sub-block is added at the top",
+      "input": [
+        "\"GameInfo\"",
+        "{",
+        "\tSceneSystem",
+        "\t{",
+        "\t\tShadows",
+        "\t\t{",
+        "\t\t\tCSMCascadeResolution 2048",
+        "\t\t}",
+        "\t}",
+        "}",
+        ""
+      ],
+      "block": "SceneSystem",
+      "quoted": false,
+      "create": true,
+      "entries": [
+        [
+          "CSMCascadeResolution",
+          "0"
+        ]
+      ],
+      "expected": {
+        "output": [
+          "\"GameInfo\"",
+          "{",
+          "\tSceneSystem",
+          "\t{",
+          "\t\tCSMCascadeResolution\t0",
+          "",
+          "\t\tShadows",
+          "\t\t{",
+          "\t\t\tCSMCascadeResolution 2048",
+          "\t\t}",
+          "\t}",
+          "}",
+          ""
+        ],
+        "results": [
+          [
+            "CSMCascadeResolution",
+            "added"
+          ]
+        ]
+      }
     }
   ]
 }

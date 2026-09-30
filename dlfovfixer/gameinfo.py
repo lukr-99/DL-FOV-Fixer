@@ -272,31 +272,64 @@ def _fmt(key: str, value: str, quoted: bool) -> str:
     return '"%s"\t"%s"' % (key, value) if quoted else "%s\t%s" % (key, value)
 
 
+def _depths(inner: str):
+    """Brace depth before each character of a block's inner text, plus one for the end.
+
+    Braces inside quotes or ``//`` comments do not count, as in ``_matching_brace``.
+    """
+    depths = []
+    depth, in_string, in_comment = 0, False, False
+    for i, c in enumerate(inner):
+        depths.append(depth)
+        if in_comment:
+            in_comment = c != "\n"
+        elif in_string:
+            in_string = c != '"'
+        elif c == '"':
+            in_string = True
+        elif c == "/" and inner[i + 1:i + 2] == "/":
+            in_comment = True
+        elif c == "{":
+            depth += 1
+        elif c == "}":
+            depth -= 1
+    depths.append(depth)
+    return depths
+
+
+def _top_level(pattern: str, inner: str, depths):
+    """The first match of ``pattern`` that starts at the block's own level, not in a sub-block."""
+    return next((m for m in re.finditer(pattern, inner) if depths[m.start()] == 0), None)
+
+
 def _merge_one(inner: str, key: str, value: str, quoted: bool):
     """Apply one key=value to a block's inner text.
 
-    Returns ``(new_inner_or_None, action)`` where action is ``"updated"``,
-    ``"skipped_block"`` (key exists as a nested sub-block — left alone), or
+    Only the block's own keys count. A key with the same name inside a nested
+    sub-block, like ``default`` under ``rate``, is neither updated nor a reason to
+    skip. Returns ``(new_inner_or_None, action)`` where action is ``"updated"``,
+    ``"skipped_block"`` (key exists as a nested sub-block, left alone), or
     ``"add"`` (caller should insert it).
     """
     kesc = re.escape(key)
+    depths = _depths(inner)
     if quoted:
-        m = re.search(r'("%s"[ \t]+)"[^"]*"' % kesc, inner)
+        m = _top_level(r'("%s"[ \t]+)"[^"]*"' % kesc, inner, depths)
         if m:
             return inner[:m.start()] + m.group(1) + '"%s"' % value + inner[m.end():], "updated"
-        if re.search(r'"%s"\s*\{' % kesc, inner):
+        if _top_level(r'"%s"\s*\{' % kesc, inner, depths):
             return inner, "skipped_block"
     else:
         # NB: end with a lookahead for the line break (CRLF or LF) rather than
-        # ``$`` — a plain ``$`` fails on CRLF files because of the trailing \r.
-        m = re.search(
+        # ``$``, since a plain ``$`` fails on CRLF files because of the trailing \r.
+        m = _top_level(
             r'(?m)^([ \t]*%s[ \t]+)(\S+)([ \t]*)((?://[^\r\n]*)?)(?=\r?\n|\Z)' % kesc,
-            inner,
+            inner, depths,
         )
         if m:
             repl = m.group(1) + value + m.group(3) + m.group(4)
             return inner[:m.start()] + repl + inner[m.end():], "updated"
-        if re.search(r'(?m)^[ \t]*%s\s*\{' % kesc, inner):
+        if _top_level(r'(?m)^[ \t]*%s\s*\{' % kesc, inner, depths):
             return inner, "skipped_block"
     return None, "add"
 

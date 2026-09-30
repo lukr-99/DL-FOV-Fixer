@@ -71,22 +71,25 @@ public static class BlockMerge
     }
 
     /// <summary>
-    /// Applies one key to a block's inner text. Returns the new inner text and the action, or a null
-    /// text with <see cref="MergeAction.Added"/> when the key is missing and the caller inserts it.
+    /// Applies one key to a block's inner text. Only the block's own keys count: a key with the same
+    /// name inside a nested sub-block, like <c>default</c> under <c>rate</c>, is neither updated nor a
+    /// reason to skip. Returns the new inner text and the action, or a null text with
+    /// <see cref="MergeAction.Added"/> when the key is missing and the caller inserts it.
     /// </summary>
     internal static (string? Inner, MergeAction Action) MergeOne(string inner, TweakEntry entry, bool quoted)
     {
         var key = Regex.Escape(entry.Key);
+        var depths = Depths(inner);
         if (quoted)
         {
-            var match = Regex.Match(inner, $"(\"{key}\"[ \\t]+)\"[^\"]*\"", RegexOptions.CultureInvariant);
-            if (match.Success)
+            var match = TopLevel(inner, depths, $"(\"{key}\"[ \\t]+)\"[^\"]*\"", RegexOptions.CultureInvariant);
+            if (match is not null)
             {
                 var replacement = match.Groups[1].Value + $"\"{entry.Value}\"";
                 return (Splice(inner, match, replacement), MergeAction.Updated);
             }
 
-            if (Regex.IsMatch(inner, $"\"{key}\"\\s*\\{{", RegexOptions.CultureInvariant))
+            if (TopLevel(inner, depths, $"\"{key}\"\\s*\\{{", RegexOptions.CultureInvariant) is not null)
             {
                 return (inner, MergeAction.SkippedBlock);
             }
@@ -95,23 +98,70 @@ public static class BlockMerge
         {
             // End on a lookahead for CRLF or LF, not on $, which fails on CRLF files. And \z, not \Z:
             // in .NET \Z also matches before a final \n, unlike Python's \Z.
-            var match = Regex.Match(
+            var match = TopLevel(
                 inner,
+                depths,
                 $"^([ \\t]*{key}[ \\t]+)(\\S+)([ \\t]*)((?://[^\\r\\n]*)?)(?=\\r?\\n|\\z)",
                 RegexOptions.Multiline | RegexOptions.CultureInvariant);
-            if (match.Success)
+            if (match is not null)
             {
                 var replacement = match.Groups[1].Value + entry.Value + match.Groups[3].Value + match.Groups[4].Value;
                 return (Splice(inner, match, replacement), MergeAction.Updated);
             }
 
-            if (Regex.IsMatch(inner, $"^[ \\t]*{key}\\s*\\{{", RegexOptions.Multiline | RegexOptions.CultureInvariant))
+            if (TopLevel(inner, depths, $"^[ \\t]*{key}\\s*\\{{", RegexOptions.Multiline | RegexOptions.CultureInvariant) is not null)
             {
                 return (inner, MergeAction.SkippedBlock);
             }
         }
 
         return (null, MergeAction.Added);
+    }
+
+    /// <summary>The first match that starts at the block's own level, not inside a sub-block.</summary>
+    private static Match? TopLevel(string inner, int[] depths, string pattern, RegexOptions options) =>
+        Regex.Matches(inner, pattern, options).FirstOrDefault(match => depths[match.Index] == 0);
+
+    /// <summary>
+    /// The brace depth before each character of a block's inner text, plus one for the end. Braces
+    /// inside quotes or <c>//</c> comments do not count, as in <see cref="KeyValuesText.MatchingBrace"/>.
+    /// </summary>
+    private static int[] Depths(string inner)
+    {
+        var depths = new int[inner.Length + 1];
+        var (depth, inString, inComment) = (0, false, false);
+        for (var i = 0; i < inner.Length; i++)
+        {
+            depths[i] = depth;
+            var c = inner[i];
+            if (inComment)
+            {
+                inComment = c != '\n';
+            }
+            else if (inString)
+            {
+                inString = c != '"';
+            }
+            else if (c == '"')
+            {
+                inString = true;
+            }
+            else if (c == '/' && i + 1 < inner.Length && inner[i + 1] == '/')
+            {
+                inComment = true;
+            }
+            else if (c == '{')
+            {
+                depth++;
+            }
+            else if (c == '}')
+            {
+                depth--;
+            }
+        }
+
+        depths[inner.Length] = depth;
+        return depths;
     }
 
     private static string Splice(string text, Match match, string replacement) =>
