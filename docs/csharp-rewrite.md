@@ -13,7 +13,9 @@ Where the C# app differs from 1.0 on purpose:
 - Messages use a colon where 1.0 used a dash, as this repository's writing rules ask.
 - A second launch tells the running copy, which says it is already running. 1.0 started a second
   tray icon.
-- Menus and dialogs use the standard Windows look. Following the dark theme is not done yet.
+- The menu and the dialogs follow Windows' light or dark setting, or a theme chosen in the menu.
+  1.0 had no theme support. Messages use the app's own window instead of the Win32 message box,
+  which cannot be themed.
 - A build that cannot update itself, a dev build or one without a pinned publisher, offers the
   releases page from "Check for updates" instead.
 

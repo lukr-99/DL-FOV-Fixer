@@ -19,6 +19,40 @@ came from a tool or platform trap. Put new entries at the top, in this shape:
 A pitfall that could hit another repository is also reported to CodePrint. CodePrint's
 `docs/pitfalls/README.md` explains how.
 
+## WPF UI's Window style makes every plain Window throw when it is shown
+
+- Symptom:
+
+  ```text
+  System.InvalidOperationException: Cannot change AllowsTransparency after a Window has been shown or WindowInteropHelper.EnsureHandle has been called.
+  ```
+
+  from `Window.Show()` or `ShowDialog()` on any `new Window { ... }` once WPF UI's
+  `ControlsDictionary` is merged into the application resources.
+- Cause: `ControlsDictionary` brings an implicit style for `Window`, made for WPF UI's
+  `FluentWindow`, that sets `AllowsTransparency`. A window made in code is only initialized when it
+  is shown, so the style lands after the window handle exists, and WPF refuses the change.
+- Fix: `Theming/Theme.xaml`, merged after WPF UI's dictionaries, defines its own implicit `Window`
+  style that only sets the theme's background and foreground.
+- Closed off by: `ThemeResourcesTests.WindowMadeInCode_OpensInBothThemes`, which fails with the
+  message above when that style is removed (checked).
+- Seen: 2026-09-30, adding the dark theme, in an off-screen render before it shipped.
+
+## Creating the App class in a tool or a test starts the real app
+
+- Symptom: a harness that only meant to render the menu wrote the user's real `gameinfo.gi` and
+  switched the theme it was testing.
+- Cause: `new DlFovFixer.App.App()` queues WPF's startup on the dispatcher. The first time the
+  dispatcher runs, `App.OnStartup` builds the whole graph with the real `config.json`, applies the
+  fix and starts the timers.
+- Fix: never create the App class outside the app. Build a plain `Application` and merge the same
+  dictionaries App.xaml merges, including `Theming/Theme.xaml`, or run the app with
+  `--settings <path>` on a scratch config.
+- Closed off by: `ThemeResourcesTests` loads the resources on a plain `Application`, and its summary
+  says why. No automatic check stops a new tool from making the mistake.
+- Seen: 2026-09-30, the dark theme work. The merge found the file already correct, so its content
+  did not change.
+
 ## A line break typed as \n through a tool lands inside a Python string
 
 - Symptom:

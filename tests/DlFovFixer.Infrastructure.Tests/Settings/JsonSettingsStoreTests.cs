@@ -97,7 +97,8 @@ public sealed class JsonSettingsStoreTests : IDisposable
             StartWithWindows: true,
             CheckUpdatesOnStart: false,
             Tweaks: new ExtraTweaks([new("cl_x", "two words")], [new("Csm", "0")], [new("setting.a", "1")]),
-            ApplyTweaks: false);
+            ApplyTweaks: false,
+            Theme: ThemeMode.Dark);
 
         store.Save(saved);
 
@@ -105,7 +106,7 @@ public sealed class JsonSettingsStoreTests : IDisposable
     }
 
     [Fact]
-    public void Save_Keeps10KeyNamesAndAddsTheSchemaVersion()
+    public void Save_Keeps10KeyNamesAndAddsTheSchemaVersionAndTheTheme()
     {
         var path = _folder.File("config.json");
 
@@ -113,11 +114,27 @@ public sealed class JsonSettingsStoreTests : IDisposable
 
         var root = JsonNode.Parse(File.ReadAllText(path))!.AsObject();
         Assert.Equal(
-            ["schemaVersion", "gameinfo_path", "fov_value", "auto_apply_on_start", "periodic_check_minutes", "start_with_windows", "check_updates_on_start", "tweaks", "apply_tweaks"],
+            ["schemaVersion", "gameinfo_path", "fov_value", "auto_apply_on_start", "periodic_check_minutes", "start_with_windows", "check_updates_on_start", "tweaks", "apply_tweaks", "theme"],
             root.Select(property => property.Key));
         Assert.Equal(JsonSettingsStore.SchemaVersion, root["schemaVersion"]!.GetValue<int>());
+        Assert.Equal("system", root["theme"]!.GetValue<string>());
         Assert.Equal(["convars", "scenesystem", "video"], root["tweaks"]!.AsObject().Select(property => property.Key));
         Assert.Equal(["config.json"], Directory.GetFiles(_folder.Path).Select(Path.GetFileName));
+    }
+
+    [Theory]
+    [InlineData("\"light\"", ThemeMode.Light)]
+    [InlineData("\"dark\"", ThemeMode.Dark)]
+    [InlineData("\"system\"", ThemeMode.System)]
+    [InlineData("\"Dark\"", ThemeMode.System)]
+    [InlineData("\"purple\"", ThemeMode.System)]
+    [InlineData("1", ThemeMode.System)]
+    public void Load_Theme_FallsBackToSystemUnlessItIsKnown(string json, ThemeMode expected)
+    {
+        var path = _folder.File("config.json");
+        File.WriteAllText(path, $"{{ \"theme\": {json} }}");
+
+        Assert.Equal(expected, new JsonSettingsStore(path).Load().Theme);
     }
 
     private static string[] Pairs(IEnumerable<TweakEntry> entries) => [.. entries.Select(entry => $"{entry.Key}={entry.Value}")];

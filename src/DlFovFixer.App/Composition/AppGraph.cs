@@ -3,6 +3,7 @@ using System.Net.Http;
 using System.Windows.Threading;
 using DlFovFixer.App.Shell;
 using DlFovFixer.App.Startup;
+using DlFovFixer.App.Theming;
 using DlFovFixer.App.ViewModels;
 using DlFovFixer.Core.Applying;
 using DlFovFixer.Core.Updates;
@@ -28,6 +29,7 @@ public sealed class AppGraph : IDisposable
     private readonly TrayViewModel _model;
     private readonly UpdatesViewModel _updates;
     private readonly HttpClient _http;
+    private readonly ThemeApplier _theme;
     private readonly DispatcherTimer _timer = new();
     private readonly GameInfoWatcher _watcher = new(WatcherQuietPeriod);
 
@@ -45,7 +47,8 @@ public sealed class AppGraph : IDisposable
             signInStartup.Repair();
         }
 
-        var prompts = new WpfUserPrompts(TrayViewModel.AppTitle);
+        _theme = new ThemeApplier(System.Windows.Application.Current.Resources, ThemeApplier.WindowsAppsUseDark);
+        var prompts = new WpfUserPrompts(TrayViewModel.AppTitle, _theme.Attach);
         var opener = new ShellFileOpener();
         TrayViewModel? model = null;
         _tray = new TrayIcon(title, () => model?.ApplyNow());
@@ -81,9 +84,16 @@ public sealed class AppGraph : IDisposable
         var dispatcher = Dispatcher.CurrentDispatcher;
         _model.Changed += (_, _) =>
         {
+            if (_model.Settings.Theme != _theme.Mode)
+            {
+                _theme.Apply(_model.Settings.Theme);
+            }
+
             Render();
             _watcher.Watch(_model.Settings.GameInfoPath);
         };
+        _theme.Applied += (_, _) => Render();
+        _theme.Apply(_model.Settings.Theme);
         _watcher.Changed += (_, _) => dispatcher.BeginInvoke(_model.Tick);
         _updates.Changed += (_, _) => Render();
         _updates.ExitRequested += (_, _) => quit();
@@ -114,6 +124,7 @@ public sealed class AppGraph : IDisposable
     {
         _timer.Stop();
         _watcher.Dispose();
+        _theme.Dispose();
         _tray.Dispose();
         _http.Dispose();
     }

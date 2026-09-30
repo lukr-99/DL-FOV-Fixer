@@ -1,0 +1,17 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <!--
+        The app's own styles on top of WPF UI's. Merged after WPF UI's dictionaries in App.xaml.
+        Tests load this file on its own, because creating the App class starts the whole app.
+    -->
+
+    <!--
+        Replaces WPF UI's implicit Window style, which is made for its FluentWindow. On a plain Window
+        made in code that style arrives only when the window is shown, and changing AllowsTransparency
+        then throws. See docs/pitfalls.md. This one only paints the theme's colors.
+    -->
+    <Style TargetType="{x:Type Window}">
+        <Setter Property="Background" Value="{DynamicResource DL.BackgroundBrush}" />
+        <Setter Property="Foreground" Value="{DynamicResource DL.TextPrimaryBrush}" />
+    </Style>
+</ResourceDictionary>

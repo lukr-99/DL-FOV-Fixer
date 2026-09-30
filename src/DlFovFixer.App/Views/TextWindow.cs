@@ -42,12 +42,12 @@ public sealed class TextWindow : Window
         };
 
         var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
-        var accept = new Button { Content = acceptLabel, MinWidth = 88, IsDefault = !multiline, Padding = new Thickness(8, 2, 8, 2) };
+        var accept = new Button { Content = acceptLabel, MinWidth = 88, IsDefault = !multiline };
         accept.Click += (_, _) => DialogResult = true;
         buttons.Children.Add(accept);
         if (!readOnly)
         {
-            var cancel = new Button { Content = "Cancel", MinWidth = 88, IsCancel = true, Margin = new Thickness(8, 0, 0, 0), Padding = new Thickness(8, 2, 8, 2) };
+            var cancel = new Button { Content = "Cancel", MinWidth = 88, IsCancel = true, Margin = new Thickness(8, 0, 0, 0) };
             buttons.Children.Add(cancel);
         }
 
@@ -79,15 +79,19 @@ public sealed class TextWindow : Window
     }
 
     /// <summary>Asks for one line. Null when cancelled.</summary>
-    public static string? AskLine(string title, string prompt, string initial) =>
-        Ask(new TextWindow(title, prompt, initial, multiline: false, readOnly: false, "OK"));
+    public static string? AskLine(string title, string prompt, string initial, Action<Window> prepare) =>
+        Ask(new TextWindow(title, prompt, initial, multiline: false, readOnly: false, "OK"), prepare);
 
     /// <summary>Asks for any number of lines. Null when cancelled.</summary>
-    public static string? AskLines(string title, string prompt) =>
-        Ask(new TextWindow(title, prompt, string.Empty, multiline: true, readOnly: false, "Import"));
+    public static string? AskLines(string title, string prompt, Action<Window> prepare) =>
+        Ask(new TextWindow(title, prompt, string.Empty, multiline: true, readOnly: false, "Import"), prepare);
 
-    public static void Show(string title, string text) =>
-        new TextWindow(title, string.Empty, text, multiline: true, readOnly: true, "Close").ShowDialog();
+    public static void Show(string title, string text, Action<Window> prepare) =>
+        Ask(new TextWindow(title, string.Empty, text, multiline: true, readOnly: true, "Close"), prepare);
 
-    private static string? Ask(TextWindow window) => window.ShowDialog() == true ? window._text.Text : null;
+    private static string? Ask(TextWindow window, Action<Window> prepare)
+    {
+        prepare(window);
+        return window.ShowDialog() == true ? window._text.Text : null;
+    }
 }

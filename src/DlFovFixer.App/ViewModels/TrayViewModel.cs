@@ -189,6 +189,14 @@ public sealed class TrayViewModel(
 
     public void ToggleApplyTweaks() => Save(Settings with { ApplyTweaks = !Settings.ApplyTweaks });
 
+    public void SetTheme(ThemeMode theme)
+    {
+        if (theme != Settings.Theme)
+        {
+            Save(Settings with { Theme = theme });
+        }
+    }
+
     public void ToggleCheckUpdatesOnStart() => Save(Settings with { CheckUpdatesOnStart = !Settings.CheckUpdatesOnStart });
 
     public void ToggleAutoApply() => Save(Settings with { AutoApplyOnStart = !Settings.AutoApplyOnStart });

@@ -53,7 +53,8 @@ public sealed class JsonSettingsStore(string path) : ISettingsStore
             StartWithWindows: ReadBool(root, "start_with_windows") ?? defaults.StartWithWindows,
             CheckUpdatesOnStart: ReadBool(root, "check_updates_on_start") ?? defaults.CheckUpdatesOnStart,
             Tweaks: ReadTweaks(root["tweaks"] as JsonObject),
-            ApplyTweaks: ReadBool(root, "apply_tweaks") ?? defaults.ApplyTweaks);
+            ApplyTweaks: ReadBool(root, "apply_tweaks") ?? defaults.ApplyTweaks,
+            Theme: ReadTheme(root) ?? defaults.Theme);
     }
 
     public void Save(AppSettings settings)
@@ -74,6 +75,7 @@ public sealed class JsonSettingsStore(string path) : ISettingsStore
                 ["video"] = WritePairs(settings.Tweaks.Video),
             },
             ["apply_tweaks"] = settings.ApplyTweaks,
+            ["theme"] = settings.Theme.ToString().ToLowerInvariant(),
         };
 
         Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(path))!);
@@ -88,6 +90,15 @@ public sealed class JsonSettingsStore(string path) : ISettingsStore
 
         // 1.0 turned whatever it found into text with str(), so a number stays usable.
         JsonValue value when value.GetValueKind() == JsonValueKind.Number => value.ToJsonString(),
+        _ => null,
+    };
+
+    /// <summary>"system", "light" or "dark". 2.0 added the key, and 1.0 ignores it.</summary>
+    private static ThemeMode? ReadTheme(JsonObject root) => ReadString(root, "theme") switch
+    {
+        "system" => ThemeMode.System,
+        "light" => ThemeMode.Light,
+        "dark" => ThemeMode.Dark,
         _ => null,
     };
 
