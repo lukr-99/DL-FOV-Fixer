@@ -1,0 +1,84 @@
+name: Release Windows
+
+# The C# 2.x installer. Push a tag v2.* that matches version.properties. The release is created
+# as a DRAFT, so it can be checked before anyone (including the in-app updater) sees it.
+# The 1.x Python build ships from release.yml on v1.* tags.
+
+on:
+  push:
+    tags:
+      - "v2.*"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-windows
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Signed installer
+    runs-on: windows-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+
+      - name: Test
+        run: dotnet test --solution DL-FOV-Fixer.slnx -c Release
+
+      - name: Tag matches version.properties
+        shell: pwsh
+        run: |
+          $line = Get-Content version.properties | Where-Object { $_ -match '^versionName=' } | Select-Object -First 1
+          $name = ($line -replace '^versionName=', '').Trim()
+          if ("v$name" -ne $env:GITHUB_REF_NAME) {
+            throw "Tag $env:GITHUB_REF_NAME does not match versionName $name in version.properties."
+          }
+
+      - name: Make sure Inno Setup 6 is available
+        shell: pwsh
+        run: |
+          if (-not (Test-Path "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe")) {
+            choco install innosetup --no-progress -y
+            if ($LASTEXITCODE -ne 0) { throw 'Installing Inno Setup failed.' }
+          }
+
+      - name: Build and sign the installer
+        shell: pwsh
+        env:
+          WINDOWS_CERT_PFX_BASE64: ${{ secrets.WINDOWS_CERT_PFX_BASE64 }}
+          WINDOWS_CERT_PASSWORD: ${{ secrets.WINDOWS_CERT_PASSWORD }}
+        run: ./installer/build-installer.ps1 -Release
+
+      - name: Report signing status
+        if: always()
+        shell: pwsh
+        run: |
+          # if: always() means this also runs when the build failed, so the files may not exist.
+          $files = @('artifacts/publish/DL-FOV-Fixer.exe') + @(Get-ChildItem -Path artifacts -Filter '*-setup.exe' -ErrorAction SilentlyContinue | ForEach-Object { $_.FullName })
+          foreach ($file in $files) {
+            if (Test-Path -LiteralPath $file) {
+              $status = (Get-AuthenticodeSignature -LiteralPath $file).Status
+              "$(Split-Path -Leaf $file) signature: $status" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append
+            }
+          }
+
+      # The installer must be the only .exe asset. The 1.0.0 updater takes any .exe asset it finds,
+      # so a second .exe (the app itself, for example) could be picked and copied over an old copy.
+      - name: Create draft GitHub Release
+        uses: softprops/action-gh-release@v3
+        with:
+          draft: true
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+          files: |
+            artifacts/DL-FOV-Fixer-*-setup.exe
+            artifacts/DL-FOV-Fixer-*-setup.exe.sha256
+            artifacts/manifest.json
