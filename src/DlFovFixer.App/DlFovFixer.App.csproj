@@ -37,10 +37,12 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- The notification area icon. WPF has none of its own. -->
-    <PackageReference Include="H.NotifyIcon.Wpf" Version="2.4.1" />
-    <!-- Light, dark and high-contrast styles for the menu and the dialogs, as GoalMaker uses. -->
-    <PackageReference Include="WPF-UI" Version="4.3.0" />
+    <!--
+      The shared tray kit: the notification area icon, the menu builder, WPF UI's light, dark and
+      high-contrast styles, the dialogs and the single-instance lock. It brings H.NotifyIcon and
+      WPF UI along. From dotnetlib's GitHub Packages feed, see nuget.config.
+    -->
+    <PackageReference Include="DotNetLib.Tray" Version="0.2.0" />
   </ItemGroup>
 
   <ItemGroup>

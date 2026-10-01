@@ -6,12 +6,14 @@ using DlFovFixer.App.Startup;
 using DlFovFixer.App.Theming;
 using DlFovFixer.App.ViewModels;
 using DlFovFixer.Core.Applying;
+using DlFovFixer.Core.Settings;
 using DlFovFixer.Core.Updates;
 using DlFovFixer.Infrastructure.GameFiles;
 using DlFovFixer.Infrastructure.Locating;
 using DlFovFixer.Infrastructure.Settings;
 using DlFovFixer.Infrastructure.Startup;
 using DlFovFixer.Infrastructure.Updates;
+using DotNetLib.Tray;
 
 namespace DlFovFixer.App.Composition;
 
@@ -25,12 +27,13 @@ public sealed class AppGraph : IDisposable
     /// <summary>The repository whose releases are the update channel.</summary>
     public const string RepositoryUrl = "https://github.com/lukr-99/DL-FOV-Fixer";
 
-    private readonly TrayIcon _tray;
+    private readonly TrayIconHost _tray;
+    private readonly TrayNotifier _notifier;
     private readonly TrayViewModel _model;
     private readonly UpdatesViewModel _updates;
     private readonly HttpClient _http;
     private readonly EcdsaSignatureVerifier? _signatures;
-    private readonly ThemeApplier _theme;
+    private readonly TrayThemeApplier _theme;
     private readonly DispatcherTimer _timer = new();
     private readonly GameInfoWatcher _watcher = new(WatcherQuietPeriod);
 
@@ -48,11 +51,17 @@ public sealed class AppGraph : IDisposable
             signInStartup.Repair();
         }
 
-        _theme = new ThemeApplier(System.Windows.Application.Current.Resources, ThemeApplier.WindowsAppsUseDark);
+        _theme = new TrayThemeApplier(
+            System.Windows.Application.Current.Resources,
+            TrayThemeApplier.WindowsAppsUseDark,
+            WarmPalettes.Light,
+            WarmPalettes.Dark);
         var prompts = new WpfUserPrompts(TrayViewModel.AppTitle, _theme.Attach);
         var opener = new ShellFileOpener();
         TrayViewModel? model = null;
-        _tray = new TrayIcon(title, () => model?.ApplyNow());
+        _tray = new TrayIconHost(title, () => model?.ApplyNow());
+        _tray.SetIcon(StatusIconFactory.CreateIcon(StatusColor.Amber));
+        _notifier = new TrayNotifier(_tray, title);
         _model = model = new TrayViewModel(
             new JsonSettingsStore(options.SettingsPath ?? JsonSettingsStore.DefaultPath),
             new ApplyService(files),
@@ -61,7 +70,7 @@ public sealed class AppGraph : IDisposable
             signInStartup,
             files,
             prompts,
-            _tray,
+            _notifier,
             opener);
 
         _http = new HttpClient { Timeout = TimeSpan.FromMinutes(10) };
@@ -76,27 +85,29 @@ public sealed class AppGraph : IDisposable
             new GitHubReleaseChannel(_http, address, downloads),
             _signatures ?? (ISignatureVerifier)new NoSignatureVerifier(),
             new InstallerLauncher());
-        _updates = new UpdatesViewModel(service, build.Version, address.ReleasesPage, prompts, _tray, opener);
+        _updates = new UpdatesViewModel(service, build.Version, address.ReleasesPage, prompts, _notifier, opener);
 
         void Render()
         {
-            _tray.SetStatus(StatusColors.Of(_model.Status.State), $"{title}: {TrayViewModel.Describe(_model.Status.State)}");
+            _tray.SetIcon(StatusIconFactory.CreateIcon(StatusColors.Of(_model.Status.State)));
+            _tray.SetToolTip($"{title}: {TrayViewModel.Describe(_model.Status.State)}");
             _tray.SetMenu(TrayMenu.Build(_model, _updates, quit));
         }
 
         var dispatcher = Dispatcher.CurrentDispatcher;
         _model.Changed += (_, _) =>
         {
-            if (_model.Settings.Theme != _theme.Mode)
+            var mode = ToTrayMode(_model.Settings.Theme);
+            if (mode != _theme.Mode)
             {
-                _theme.Apply(_model.Settings.Theme);
+                _theme.Apply(mode);
             }
 
             Render();
             _watcher.Watch(_model.Settings.GameInfoPath);
         };
         _theme.Applied += (_, _) => Render();
-        _theme.Apply(_model.Settings.Theme);
+        _theme.Apply(ToTrayMode(_model.Settings.Theme));
         _watcher.Changed += (_, _) => dispatcher.BeginInvoke(_model.Tick);
         _updates.Changed += (_, _) => Render();
         _updates.ExitRequested += (_, _) => quit();
@@ -105,7 +116,7 @@ public sealed class AppGraph : IDisposable
 
     /// <summary>Called when the app is launched again while this one runs.</summary>
     public void OnLaunchedAgain() =>
-        _tray.Notify("DL-FOV-Fixer is already running. Right-click its icon in the tray for the menu.");
+        _notifier.Notify("DL-FOV-Fixer is already running. Right-click its icon in the tray for the menu.");
 
     public void Start()
     {
@@ -122,6 +133,14 @@ public sealed class AppGraph : IDisposable
             _ = _updates.CheckAsync(interactive: false);
         }
     }
+
+    /// <summary>The saved theme setting as the tray kit's mode.</summary>
+    internal static TrayThemeMode ToTrayMode(ThemeMode mode) => mode switch
+    {
+        ThemeMode.Light => TrayThemeMode.Light,
+        ThemeMode.Dark => TrayThemeMode.Dark,
+        _ => TrayThemeMode.System,
+    };
 
     public void Dispose()
     {

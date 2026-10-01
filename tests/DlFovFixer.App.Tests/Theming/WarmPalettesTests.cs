@@ -1,11 +1,14 @@
 using System.Windows.Media;
 using DlFovFixer.App.Theming;
-using DlFovFixer.Core.Settings;
+using DotNetLib.Tray;
 
 namespace DlFovFixer.App.Tests.Theming;
 
-/// <summary>Both palettes are complete, and their text is readable (WCAG AA, 4.5 to 1).</summary>
-public sealed class ThemePaletteTests
+/// <summary>
+/// The app's warm palettes replace the kit's neutral ones, so they must meet the same bar: readable
+/// text (WCAG AA, 4.5 to 1) and status and focus colors that stand out (3 to 1).
+/// </summary>
+public sealed class WarmPalettesTests
 {
     public static TheoryData<string> Palettes() => ["Light", "Dark"];
 
@@ -38,31 +41,13 @@ public sealed class ThemePaletteTests
         var palette = Palette(name);
 
         // WCAG's 3 to 1 for graphics and focus indicators.
-        foreach (var color in new[] { palette.Danger, palette.Success, palette.Focus })
+        foreach (var color in new[] { palette.Danger, palette.Success, palette.Warning, palette.Focus })
         {
             Assert.True(Contrast(color, palette.Background) >= 3, $"{name} {color}");
         }
     }
 
-    [Fact]
-    public void Palettes_SetTheSameTokens()
-    {
-        var light = ThemePalette.Light.Tokens().Select(token => token.Key);
-        var dark = ThemePalette.Dark.Tokens().Select(token => token.Key);
-
-        Assert.Equal(light, dark);
-        Assert.Equal(11, light.Distinct().Count());
-    }
-
-    [Theory]
-    [InlineData(ThemeMode.Light, true, false)]
-    [InlineData(ThemeMode.Dark, false, true)]
-    [InlineData(ThemeMode.System, true, true)]
-    [InlineData(ThemeMode.System, false, false)]
-    public void IsDarkFor_FollowsWindowsOnlyInSystemMode(ThemeMode mode, bool windowsIsDark, bool expected) =>
-        Assert.Equal(expected, ThemeApplier.IsDarkFor(mode, windowsIsDark));
-
-    private static ThemePalette Palette(string name) => name == "Dark" ? ThemePalette.Dark : ThemePalette.Light;
+    private static TrayPalette Palette(string name) => name == "Dark" ? WarmPalettes.Dark : WarmPalettes.Light;
 
     private static double Contrast(Color a, Color b)
     {

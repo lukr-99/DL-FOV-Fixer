@@ -17,6 +17,10 @@ concurrency:
   group: release-windows
   cancel-in-progress: false
 
+env:
+  # DotNetLib.Tray comes from dotnetlib's private GitHub Packages feed (see ci.yml).
+  NuGetPackageSourceCredentials_dotnetlib: Username=lukr-99;Password=${{ secrets.DOTNETLIB_PACKAGES_TOKEN }}
+
 jobs:
   release:
     name: Installer and signed manifest
