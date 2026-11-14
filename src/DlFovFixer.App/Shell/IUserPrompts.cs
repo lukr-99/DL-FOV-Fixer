@@ -18,4 +18,7 @@ public interface IUserPrompts
 
     /// <summary>Shows text the user can read and copy, but not change.</summary>
     void ShowText(string title, string text);
+
+    /// <summary>Shows the About window and returns when it is closed.</summary>
+    void ShowAbout(AboutContent content);
 }

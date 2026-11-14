@@ -5,6 +5,10 @@ Every release, newest first. The version lives in `version.properties`, and a re
 
 ## Unreleased
 
+- **About** is now a themed window in the app's warm colors, light and dark. It credits the author,
+  invites feedback with links to Instagram, GitHub and this repository's Issues, shows the version
+  and the current settings, and lists the licences of what the app ships.
+
 - The tray shell now uses the shared `DotNetLib.Tray` package for its icon, menu, theming, dialogs
   and single-instance lock. The menu, the icon and the warm colors look the same. The paste dialog's
   button now says "OK" instead of "Import".

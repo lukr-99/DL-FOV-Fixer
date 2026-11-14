@@ -9,7 +9,7 @@ namespace DlFovFixer.App.Shell;
 /// theme's colors. The file picker is Windows' own and follows Windows' theme. A tray app has no
 /// window to own it, so it gets a hidden topmost owner and cannot open behind the game.
 /// </summary>
-public sealed class WpfUserPrompts(string title, Action<Window> prepare) : IUserPrompts
+public sealed class WpfUserPrompts(string title, Action<Window> prepare, IFileOpener opener) : IUserPrompts
 {
     public string? AskValue(string current) => TrayTextWindow.AskLine(
         title,
@@ -41,6 +41,13 @@ public sealed class WpfUserPrompts(string title, Action<Window> prepare) : IUser
     public void Inform(string message) => TrayMessageWindow.Inform(title, message, prepare);
 
     public void ShowText(string heading, string text) => TrayTextWindow.Show($"{title}: {heading}", text, prepare);
+
+    public void ShowAbout(AboutContent content)
+    {
+        var window = new AboutWindow(content, opener);
+        prepare(window);
+        window.ShowDialog();
+    }
 
     private static T WithOwner<T>(Func<Window, T> show)
     {

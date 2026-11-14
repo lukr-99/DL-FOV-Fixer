@@ -44,6 +44,30 @@ public sealed class ThemeResourcesTests
                 {
                     results.Add($"{mode}: {exception.Message}");
                 }
+                try
+                {
+                    var about = new DlFovFixer.App.Shell.AboutWindow(
+                        new DlFovFixer.App.Shell.AboutContent("2.0.0", [new("Target", "r_aspectratio 2.49")]),
+                        new NoOpener());
+                    about.Left = -10000;
+                    about.Top = -10000;
+                    about.ShowInTaskbar = false;
+                    theme.Attach(about);
+                    about.Show();
+                    var brush = (System.Windows.Media.SolidColorBrush)about.FindResource("Tray.PrimaryBrush");
+                    var primary = mode == TrayThemeMode.Dark ? WarmPalettes.Dark.Primary : WarmPalettes.Light.Primary;
+                    if (brush.Color != primary)
+                    {
+                        results.Add($"{mode}: About primary {brush.Color}, expected {primary}");
+                    }
+
+                    about.Close();
+                }
+                catch (Exception exception)
+                {
+                    results.Add($"{mode}: About window: {exception.Message}");
+                }
+
                 finally
                 {
                     window.Close();
@@ -56,5 +80,12 @@ public sealed class ThemeResourcesTests
         });
 
         Assert.Empty(failures);
+    }
+
+    private sealed class NoOpener : DlFovFixer.App.Shell.IFileOpener
+    {
+        public void Open(string path)
+        {
+        }
     }
 }

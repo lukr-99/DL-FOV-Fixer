@@ -56,8 +56,8 @@ public sealed class AppGraph : IDisposable
             TrayThemeApplier.WindowsAppsUseDark,
             WarmPalettes.Light,
             WarmPalettes.Dark);
-        var prompts = new WpfUserPrompts(TrayViewModel.AppTitle, _theme.Attach);
         var opener = new ShellFileOpener();
+        var prompts = new WpfUserPrompts(TrayViewModel.AppTitle, _theme.Attach, opener);
         TrayViewModel? model = null;
         _tray = new TrayIconHost(title, () => model?.ApplyNow());
         _tray.SetIcon(StatusIconFactory.CreateIcon(StatusColor.Amber));

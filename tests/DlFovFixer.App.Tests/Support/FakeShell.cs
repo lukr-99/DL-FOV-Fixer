@@ -45,6 +45,10 @@ internal sealed class FakeShell : IUserPrompts, INotifier, IFileOpener, ISignInS
 
     public void ShowText(string title, string text) => Shown = (title, text);
 
+    public AboutContent? AboutShown { get; private set; }
+
+    public void ShowAbout(AboutContent content) => AboutShown = content;
+
     public void Notify(string message) => Notifications.Add(message);
 
     public void Open(string path) => Opened.Add(path);

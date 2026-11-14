@@ -1,4 +1,5 @@
 using System.IO;
+using DlFovFixer.App.Composition;
 using DlFovFixer.App.Shell;
 using DlFovFixer.Core.Applying;
 using DlFovFixer.Core.GameInfo;
@@ -240,15 +241,15 @@ public sealed class TrayViewModel(
     public void ShowAbout()
     {
         var path = Settings.GameInfoPath;
-        prompts.Inform(
-            "DL-FOV-Fixer\n\n" +
-            "Keeps Deadlock's FOV fix (r_aspectratio in gameinfo.gi) applied. It applies it again, with any " +
-            "pasted extra config, after a game update wipes the file.\n\n" +
-            $"File: {(path.Length > 0 ? path : "(not located)")}\n" +
-            $"Target: r_aspectratio {FovLabel(Settings.FovValue)}\n" +
-            $"Extra tweaks: {Counts(Settings.Tweaks)} ({(Settings.ApplyTweaks ? "on" : "off")})\n" +
-            $"Update checks on start: {(Settings.CheckUpdatesOnStart ? "on" : "off")}\n" +
-            $"Backup:{(HasGameInfo() ? files.BackupPathOf(path) : "(n/a)")}");
+        prompts.ShowAbout(new AboutContent(
+            BuildInfo.Current.Version,
+            [
+                new("File", path.Length > 0 ? path : "(not located)"),
+                new("Target", $"r_aspectratio {FovLabel(Settings.FovValue)}"),
+                new("Extra tweaks", $"{Counts(Settings.Tweaks)} ({(Settings.ApplyTweaks ? "on" : "off")})"),
+                new("Update checks on start", Settings.CheckUpdatesOnStart ? "on" : "off"),
+                new("Backup", HasGameInfo() ? files.BackupPathOf(path) : "(n/a)"),
+            ]));
     }
 
     /// <summary>A value with its field of view when it is a number, like "2.49 (~101°)".</summary>
