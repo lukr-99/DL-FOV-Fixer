@@ -330,6 +330,19 @@ public sealed class TrayViewModelTests
         Assert.Equal(1, fired);
     }
 
+    [Fact]
+    public void ShowAbout_GivesTheWindowTheVersionAndTheCurrentSettings()
+    {
+        var model = Create();
+
+        model.ShowAbout();
+
+        var about = _shell.AboutShown!;
+        Assert.Equal(DlFovFixer.App.Composition.BuildInfo.Current.Version, about.Version);
+        Assert.Contains(about.Facts, fact => fact is { Label: "Target", Value: "r_aspectratio 2.49 (~101°)" });
+        Assert.Contains(about.Facts, fact => fact.Label == "File" && fact.Value == GameInfoPath);
+    }
+
     [Theory]
     [InlineData(FixState.Ok, "DL FOV Fixer: up to date")]
     [InlineData(FixState.Waiting, "DL FOV Fixer: waiting for Deadlock to close")]
