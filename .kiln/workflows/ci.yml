@@ -1,0 +1,65 @@
+# Local (Kiln) version of .github/workflows/ci.yml. Run it with:
+#   kiln run .kiln/workflows/ci.yml --repo .
+# GitHub runs this on windows-latest with a private NuGet feed token. Kiln has no such secret set, so
+# this file runs what does not need the private "dotnetlib" feed, on Linux:
+# - PowerShell parse check (same script as GitHub, in a PowerShell image);
+# - restore, format check, build and tests of Core and Core.Tests (plain net10.0).
+# Left out, still run by GitHub Actions:
+# - DlFovFixer.App (needs DotNetLib.Tray from the private feed) and App.Tests;
+# - Infrastructure, Infrastructure.Tests, App.Tests (net10.0-windows, WindowsDesktop runtime missing on Linux).
+# Once the owner runs `kiln secret set DOTNETLIB_PACKAGES_TOKEN`, ci-github-only.yml shows the full-solution steps.
+name: CI
+
+on:
+  workflow_dispatch:
+
+env:
+  DOTNET_CLI_TELEMETRY_OPTOUT: "1"
+  DOTNET_NOLOGO: "1"
+
+jobs:
+  powershell:
+    name: Parse-check PowerShell scripts
+    runs-on: ubuntu-latest
+    container: mcr.microsoft.com/powershell:lts-ubuntu-22.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Parse-check PowerShell scripts
+        shell: pwsh
+        run: |
+          $failed = $false
+          foreach ($file in Get-ChildItem -Path installer, tools -Recurse -Filter *.ps1) {
+            $errors = $null
+            [void][System.Management.Automation.Language.Parser]::ParseFile($file.FullName, [ref]$null, [ref]$errors)
+            foreach ($e in $errors) {
+              Write-Host "::error file=$($file.FullName),line=$($e.Extent.StartLineNumber)::$($e.Message)"
+              $failed = $true
+            }
+          }
+          if ($failed) { exit 1 }
+
+  dotnet:
+    name: Core format, build and tests (Linux)
+    runs-on: ubuntu-latest
+    container: mcr.microsoft.com/dotnet/sdk:10.0
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Restore
+        run: dotnet restore tests/DlFovFixer.Core.Tests/DlFovFixer.Core.Tests.csproj
+
+      - name: Check formatting
+        run: |
+          dotnet format src/DlFovFixer.Core/DlFovFixer.Core.csproj --verify-no-changes --no-restore
+          dotnet format tests/DlFovFixer.Core.Tests/DlFovFixer.Core.Tests.csproj --verify-no-changes --no-restore
+
+      - name: Build
+        run: dotnet build tests/DlFovFixer.Core.Tests/DlFovFixer.Core.Tests.csproj -c Release --no-restore
+
+      # NOT RUN HERE: ApplyServiceTests.Apply_VideoTweaks_CreatesVideoTxtBesideGameInfo. It builds a Windows path
+      # (D:\Steam\...) and expects Windows path rules, so it fails on Linux. GitHub Actions (Windows) runs it.
+      - name: Test
+        run: dotnet test --project tests/DlFovFixer.Core.Tests/DlFovFixer.Core.Tests.csproj -c Release --no-build --filter-not-method "*Apply_VideoTweaks_CreatesVideoTxtBesideGameInfo"
