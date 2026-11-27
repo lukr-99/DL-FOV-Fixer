@@ -1,0 +1,24 @@
+# NOT run by default. The full-solution steps of .github/workflows/ci.yml, for when the owner has set
+# the secret with `kiln secret set DOTNETLIB_PACKAGES_TOKEN` (a read:packages token for the dotnetlib
+# feed). The tests cannot run on Linux for the net10.0-windows projects. Not verified: no token.
+name: CI (needs the dotnetlib token)
+
+on:
+  workflow_dispatch:
+
+env:
+  DOTNET_CLI_TELEMETRY_OPTOUT: "1"
+  DOTNET_NOLOGO: "1"
+  EnableWindowsTargeting: "true"
+  NuGetPackageSourceCredentials_dotnetlib: Username=lukr-99;Password=${{ secrets.DOTNETLIB_PACKAGES_TOKEN }}
+
+jobs:
+  solution:
+    runs-on: ubuntu-latest
+    container: mcr.microsoft.com/dotnet/sdk:10.0
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - run: dotnet restore DL-FOV-Fixer.slnx
+      - run: dotnet format DL-FOV-Fixer.slnx --verify-no-changes --no-restore
+      - run: dotnet build DL-FOV-Fixer.slnx -c Release --no-restore
